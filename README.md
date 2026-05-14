@@ -1,5 +1,5 @@
 # kda-projek-kelompok-2
-projek mata kuliah keamanana data dan aplikasinya
+projek mata kuliah keamanan data dan aplikasinya
 
 anggota : 
 1. Najma Syakira (L0224023)
