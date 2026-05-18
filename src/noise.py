@@ -97,8 +97,8 @@ class PrivacyBudgetTracker:
             'timestamp': datetime.now().strftime('%H:%M:%S'),
         })
 
-        print(f'✓ ε={epsilon:.4f} dikonsumsi → "{operation_name}"')
-        print(f'  Sisa budget: ε={self.remaining():.4f}')
+        print(f'[OK] eps={epsilon:.4f} dikonsumsi -> "{operation_name}"')
+        print(f'  Sisa budget: eps={self.remaining():.4f}')
 
     def remaining(self):
         return self.total_epsilon - self.used_epsilon

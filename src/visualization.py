@@ -45,7 +45,7 @@ def visualize_acdp_tree(node, max_display_depth=3):
             shape = 'box'
         else:
             label = (f'Split: {n.attribute}\n'
-                     f'→ Level {n.generalization_level}\n'
+                     f'-> Level {n.generalization_level}\n'
                      f'n={n_records}')
             fillcolor = '#87CEEB'
             shape = 'ellipse'
@@ -95,7 +95,7 @@ def plot_generalization_summary(acdp_tree):
 def plot_ace_iteration_log(ace):
     """Plot ACE iteration log (Section 12.3)."""
     if not ace.iteration_log:
-        print('✅ Tidak ada iterasi ACE — k-anonymity sudah terpenuhi dari ACDP Tree!')
+        print('[OK] Tidak ada iterasi ACE - k-anonymity sudah terpenuhi dari ACDP Tree!')
         return
 
     log_df = pd.DataFrame(ace.iteration_log)

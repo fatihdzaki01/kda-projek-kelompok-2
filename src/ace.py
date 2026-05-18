@@ -147,7 +147,7 @@ class ACE:
 
             if n_violations == 0:
                 if verbose:
-                    print(f'\n✅ k-anonymity satisfied after {iteration} iterations!')
+                    print(f'\n[OK] k-anonymity satisfied after {iteration} iterations!')
                 break
 
             violation_indices = self._get_violation_indices(df_current, violations)
@@ -161,12 +161,12 @@ class ACE:
 
             if attr_to_gen is None:
                 if verbose:
-                    print('\n⚠️  Semua attribute sudah max level.')
+                    print('\n[WARNING] Semua attribute sudah max level.')
                     print(f'   Remaining violations: {n_violations} groups')
                 break
 
             if verbose:
-                print(f'  → Generalizing "{attr_to_gen}" '
+                print(f'  -> Generalizing "{attr_to_gen}" '
                       f'for {len(violation_indices)} records')
 
             df_current = self._apply_generalization(

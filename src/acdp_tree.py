@@ -89,7 +89,7 @@ def compute_inverse_frequency_weights(df, target_col):
     for cls, w in sorted(class_weights.items()):
         cnt = counts[cls]
         pct = cnt / total * 100
-        print(f'  Kelas {int(cls)}: count={cnt:,} ({pct:.1f}%) → weight={w:.4f}')
+        print(f'  Kelas {int(cls)}: count={cnt:,} ({pct:.1f}%) -> weight={w:.4f}')
     print('=' * 40)
 
     return weights
@@ -283,7 +283,7 @@ class ACDPTree:
 
         self._collect_record_levels(self.root)
 
-        print(f'\n✅ ACDP Tree built successfully!')
+        print(f'\n[OK] ACDP Tree built successfully!')
         print(f'   Total records mapped: {len(self.record_levels):,}')
 
         return self
