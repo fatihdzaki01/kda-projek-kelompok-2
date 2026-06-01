@@ -1,0 +1,50 @@
+{
+  "dataset_info": {
+    "original_file": "data/raw/diabetes__health_indicators.csv",
+    "original_records": 253680,
+    "anonymized_records": 253680,
+    "anonymized_file": "diabetes_anonymized_k5_eps1.0.csv",
+    "noisy_counts_file": "diabetes_noisy_counts_k5_eps1.0.csv",
+    "processing_date": "2026-05-25 05:44:24"
+  },
+  "privacy_parameters": {
+    "k_anonymity": 5,
+    "epsilon": 1.0,
+    "max_generalization_level": 3
+  },
+  "attributes": {
+    "qi_attributes": [
+      "Age",
+      "Sex",
+      "Education",
+      "Income",
+      "BMI",
+      "GenHlth"
+    ],
+    "sensitive_attribute": "Diabetes_012",
+    "total_attributes": 7
+  },
+  "privacy_guarantees": {
+    "k_anonymity_satisfied": true,
+    "min_group_size": 5,
+    "max_group_size": 5136,
+    "avg_group_size": 86.58,
+    "total_groups": 2930
+  },
+  "pipeline_summary": {
+    "acdp_tree": {
+      "violations_before_ace": 924,
+      "groups_after_tree": 3539
+    },
+    "ace": {
+      "iterations": 12,
+      "records_overridden": 1928,
+      "override_percentage": 0.76
+    },
+    "noise": {
+      "mean_noise": 0.0319,
+      "std_noise": 1.4015,
+      "mean_percent_error": 23.45
+    }
+  }
+}
