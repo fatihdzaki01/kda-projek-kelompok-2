@@ -1,7 +1,7 @@
 """
 Visualization functions for ACDP Tree pipeline.
 
-Contains tree visualization (Graphviz) and all plotting functions.
+All functions take parameters explicitly (no hardcoded config).
 """
 
 import numpy as np
@@ -10,16 +10,10 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from graphviz import Digraph
 
-from src.config import QI_ATTRIBUTES, SENSITIVE_ATTRIBUTE, K_ANONYMITY, EPSILON
-
 
 def visualize_acdp_tree(node, max_display_depth=3):
     """
     Visualisasi ACDP Tree menggunakan Graphviz.
-    Setiap node menampilkan:
-    - Attribute yang di-generalisasi
-    - Level generalisasi
-    - Jumlah records
     """
     dot = Digraph(comment='ACDP Tree - Generalization Optimizer')
     dot.attr(rankdir='TB')
@@ -45,7 +39,7 @@ def visualize_acdp_tree(node, max_display_depth=3):
             shape = 'box'
         else:
             label = (f'Split: {n.attribute}\n'
-                     f'→ Level {n.generalization_level}\n'
+                     f'-> Level {n.generalization_level}\n'
                      f'n={n_records}')
             fillcolor = '#87CEEB'
             shape = 'ellipse'
@@ -69,11 +63,11 @@ def visualize_acdp_tree(node, max_display_depth=3):
     return dot
 
 
-def plot_generalization_summary(acdp_tree):
-    """Plot distribusi generalization level per attribute (Section 11.5)."""
-    fig, axes = plt.subplots(1, len(QI_ATTRIBUTES), figsize=(18, 4))
+def plot_generalization_summary(acdp_tree, qi_attributes):
+    """Plot distribusi generalization level per attribute."""
+    fig, axes = plt.subplots(1, len(qi_attributes), figsize=(18, 4))
 
-    for i, attr in enumerate(QI_ATTRIBUTES):
+    for i, attr in enumerate(qi_attributes):
         levels = [lvl[attr] for lvl in acdp_tree.record_levels.values()]
         level_counts = Counter(levels)
 
@@ -92,15 +86,15 @@ def plot_generalization_summary(acdp_tree):
     plt.show()
 
 
-def plot_ace_iteration_log(ace):
-    """Plot ACE iteration log (Section 12.3)."""
-    if not ace.iteration_log:
-        print('✅ Tidak ada iterasi ACE — k-anonymity sudah terpenuhi dari ACDP Tree!')
+def plot_ace_iteration_log(ace_enforcer):
+    """Plot enforcement iteration log."""
+    if not ace_enforcer.iteration_log:
+        print('Tidak ada iterasi enforcement - k-anonymity sudah terpenuhi!')
         return
 
-    log_df = pd.DataFrame(ace.iteration_log)
+    log_df = pd.DataFrame(ace_enforcer.iteration_log)
 
-    print('ACE ITERATION LOG:')
+    print('ENFORCEMENT ITERATION LOG:')
     print(log_df.to_string(index=False))
     print()
 
@@ -114,7 +108,7 @@ def plot_ace_iteration_log(ace):
     )
     axes[0].set_xlabel('Iteration', fontweight='bold')
     axes[0].set_ylabel('Violation Groups', fontweight='bold')
-    axes[0].set_title('ACE: Violation Reduction', fontweight='bold')
+    axes[0].set_title('Violation Reduction', fontweight='bold')
     axes[0].axhline(y=0, color='green', linestyle='--',
                     alpha=0.5, label='Target (0 violations)')
     axes[0].legend()
@@ -128,15 +122,15 @@ def plot_ace_iteration_log(ace):
     )
     axes[1].set_xlabel('Attribute', fontweight='bold')
     axes[1].set_ylabel('Times Generalized', fontweight='bold')
-    axes[1].set_title('ACE: Most Generalized Attributes', fontweight='bold')
+    axes[1].set_title('Most Generalized Attributes', fontweight='bold')
     axes[1].grid(alpha=0.3, axis='y')
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_noise_impact(df_noisy):
-    """Plot noise impact visualization (Section 13.4)."""
+def plot_noise_impact(df_noisy, epsilon):
+    """Plot noise impact visualization."""
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
 
     max_val = max(df_noisy['count'].max(), df_noisy['noisy_count'].max())
@@ -150,7 +144,7 @@ def plot_noise_impact(df_noisy):
     )
     axes[0].set_xlabel('Original Count', fontweight='bold')
     axes[0].set_ylabel('Noisy Count', fontweight='bold')
-    axes[0].set_title(f'Original vs Noisy Counts (ε={EPSILON})', fontweight='bold')
+    axes[0].set_title(f'Original vs Noisy Counts (epsilon={epsilon})', fontweight='bold')
     axes[0].legend()
     axes[0].grid(alpha=0.3)
 
@@ -191,7 +185,7 @@ def plot_noise_impact(df_noisy):
     axes[2].grid(alpha=0.3)
 
     plt.suptitle(
-        f'Differential Privacy: Laplace Noise Impact (ε={EPSILON})',
+        f'Differential Privacy: Laplace Noise Impact (epsilon={epsilon})',
         fontweight='bold', fontsize=13
     )
     plt.tight_layout()
@@ -199,7 +193,7 @@ def plot_noise_impact(df_noisy):
 
 
 def plot_information_loss(info_loss_df):
-    """Plot information loss per attribute (Section 15.1)."""
+    """Plot information loss per attribute."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     axes[0].barh(info_loss_df['Attribute'], info_loss_df['Unique Lost (%)'],
@@ -219,7 +213,7 @@ def plot_information_loss(info_loss_df):
 
 
 def plot_distribution_preservation(dist_preserve_df):
-    """Plot distribution preservation (Section 15.2)."""
+    """Plot distribution preservation."""
     fig, ax = plt.subplots(figsize=(10, 6))
 
     x = np.arange(len(dist_preserve_df))
@@ -243,11 +237,12 @@ def plot_distribution_preservation(dist_preserve_df):
     plt.show()
 
 
-def plot_reidentification_risk(df_input, df_final, orig_risk, anon_risk):
-    """Plot re-identification risk (Section 15.3)."""
+def plot_reidentification_risk(df_input, df_final, orig_risk, anon_risk,
+                               qi_attributes, k_anonymity):
+    """Plot re-identification risk."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    categories = ['Unique\nIndividuals (%)', 'Small Groups\n(< k=5) (%)']
+    categories = ['Unique\nIndividuals (%)', f'Small Groups\n(< k={k_anonymity}) (%)']
     original_vals = [orig_risk['unique_risk_pct'], orig_risk['small_group_risk_pct']]
     anonymized_vals = [anon_risk['unique_risk_pct'], anon_risk['small_group_risk_pct']]
 
@@ -265,14 +260,14 @@ def plot_reidentification_risk(df_input, df_final, orig_risk, anon_risk):
     axes[0].legend()
     axes[0].grid(alpha=0.3, axis='y')
 
-    group_sizes_orig = df_input.groupby(QI_ATTRIBUTES).size()
-    group_sizes_anon = df_final.groupby(QI_ATTRIBUTES).size()
+    group_sizes_orig = df_input.groupby(qi_attributes).size()
+    group_sizes_anon = df_final.groupby(qi_attributes).size()
 
     axes[1].hist([group_sizes_orig, group_sizes_anon],
                  bins=30, label=['Original', 'Anonymized'],
                  color=['#e74c3c', '#2ecc71'], alpha=0.7, edgecolor='white')
-    axes[1].axvline(x=K_ANONYMITY, color='blue', linestyle='--',
-                    linewidth=2, label=f'k={K_ANONYMITY} threshold')
+    axes[1].axvline(x=k_anonymity, color='blue', linestyle='--',
+                    linewidth=2, label=f'k={k_anonymity} threshold')
     axes[1].set_xlabel('Group Size', fontweight='bold')
     axes[1].set_ylabel('Frequency', fontweight='bold')
     axes[1].set_title('Group Size Distribution', fontweight='bold')
@@ -284,8 +279,8 @@ def plot_reidentification_risk(df_input, df_final, orig_risk, anon_risk):
     plt.show()
 
 
-def plot_privacy_utility_tradeoff(tradeoff):
-    """Plot privacy-utility tradeoff (Section 15.4)."""
+def plot_privacy_utility_tradeoff(tradeoff, k_anonymity, epsilon):
+    """Plot privacy-utility tradeoff."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     metrics = ['Privacy\nGain', 'Utility\nLoss']
@@ -305,7 +300,7 @@ def plot_privacy_utility_tradeoff(tradeoff):
                     [tradeoff['privacy_gain_pct']],
                     s=300, color='steelblue', edgecolor='white',
                     linewidth=2, zorder=3)
-    axes[1].annotate(f'Our Result\n(k={K_ANONYMITY}, ε={EPSILON})',
+    axes[1].annotate(f'Our Result\n(k={k_anonymity}, epsilon={epsilon})',
                      xy=(tradeoff['utility_loss_pct'], tradeoff['privacy_gain_pct']),
                      xytext=(tradeoff['utility_loss_pct'] + 5, tradeoff['privacy_gain_pct'] - 5),
                      fontsize=10, fontweight='bold',
@@ -330,8 +325,11 @@ def plot_privacy_utility_tradeoff(tradeoff):
     plt.show()
 
 
-def plot_sensitive_distribution(df_input, df_final, orig_sens_dist, anon_sens_dist):
-    """Plot sensitive attribute distribution (Section 15.5)."""
+def plot_sensitive_distribution(df_input, df_final, sensitive_attribute):
+    """Plot sensitive attribute distribution."""
+    orig_sens_dist = df_input[sensitive_attribute].value_counts(normalize=True).sort_index() * 100
+    anon_sens_dist = df_final[sensitive_attribute].value_counts(normalize=True).sort_index() * 100
+
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     x = np.arange(len(orig_sens_dist))
@@ -341,19 +339,17 @@ def plot_sensitive_distribution(df_input, df_final, orig_sens_dist, anon_sens_di
                 label='Original', color='#3498db', edgecolor='white')
     axes[0].bar(x + width / 2, anon_sens_dist.values, width,
                 label='Anonymized', color='#e74c3c', edgecolor='white')
-    axes[0].set_xlabel('Diabetes Class', fontweight='bold')
+    axes[0].set_xlabel(f'{sensitive_attribute} Class', fontweight='bold')
     axes[0].set_ylabel('Percentage (%)', fontweight='bold')
-    axes[0].set_title(f'{SENSITIVE_ATTRIBUTE} Distribution', fontweight='bold')
+    axes[0].set_title(f'{sensitive_attribute} Distribution', fontweight='bold')
     axes[0].set_xticks(x)
-    axes[0].set_xticklabels(['No Diabetes (0)', 'Prediabetes (1)', 'Diabetes (2)'])
+    axes[0].set_xticklabels([str(k) for k in orig_sens_dist.index])
     axes[0].legend()
     axes[0].grid(alpha=0.3, axis='y')
 
-    labels = ['No Diabetes', 'Prediabetes', 'Diabetes']
-    colors_pie = ['#2ecc71', '#f39c12', '#e74c3c']
-
-    axes[1].pie([orig_sens_dist.get(0, 0), orig_sens_dist.get(1, 0), orig_sens_dist.get(2, 0)],
-                labels=labels, autopct='%1.1f%%', colors=colors_pie,
+    axes[1].pie(anon_sens_dist.values,
+                labels=[str(k) for k in anon_sens_dist.index],
+                autopct='%1.1f%%',
                 startangle=90, wedgeprops={'edgecolor': 'white', 'linewidth': 2})
     axes[1].set_title('Anonymized Distribution', fontweight='bold')
 
