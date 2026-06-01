@@ -4,7 +4,7 @@ PRIVACY-PRESERVING DATA ANONYMIZATION - EVALUATION REPORT
 ================================================================================
 
 Dataset: Diabetes Health Indicators (BRFSS 2015)
-Date: 2026-05-25 05:44:25
+Date: 2026-06-01 19:53:55
 Records: 253,680 (original) → 253,680 (anonymized)
 
 ================================================================================
@@ -23,7 +23,7 @@ Differential Privacy:
   - Epsilon (ε)              : 1.0
   - Mechanism                : Laplace Noise
   - Applied to               : Aggregated counts
-  - Mean noise added         : 0.0319
+  - Mean noise added         : 0.0435
 
 Re-identification Risk:
   - Before: 42.16% unique individuals
@@ -95,7 +95,7 @@ Step 2: ACE (k-anonymity Enforcement)
 
 Step 3: Differential Privacy (Laplace Noise)
   - Epsilon consumed         : 1.0 (100%)
-  - Mean percent error       : 23.45%
+  - Mean percent error       : 23.22%
 
 ================================================================================
 6. SENSITIVE ATTRIBUTE PRESERVATION

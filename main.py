@@ -76,6 +76,13 @@ def main():
     groups = df_generalized.groupby(QI_ATTRIBUTES).size()
     n_violations = (groups < K_ANONYMITY).sum()
     print(f'\nAfter ACDP Tree: {n_violations} violation groups')
+    
+    # Export tree structure for visualization
+    tree_structure = acdp_tree.export_tree_structure()
+    tree_file = os.path.join(OUTPUT_DIR, 'acdp_tree_structure.json')
+    with open(tree_file, 'w', encoding='utf-8') as f:
+        json.dump(tree_structure, f, indent=2)
+    print(f'✅ ACDP Tree structure saved: {tree_file}')
 
     # ================================================================
     # STEP 4: Run ACE
@@ -207,7 +214,7 @@ def main():
     }
 
     metadata_file = os.path.join(OUTPUT_DIR, 'anonymization_metadata.json')
-    with open(metadata_file, 'w') as f:
+    with open(metadata_file, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, indent=2)
     print(f'✅ Metadata saved: {metadata_file}')
 
@@ -289,7 +296,7 @@ def main():
     evaluation_metrics = convert_to_serializable(evaluation_metrics)
 
     metrics_file = os.path.join(OUTPUT_DIR, 'evaluation_metrics.json')
-    with open(metrics_file, 'w') as f:
+    with open(metrics_file, 'w', encoding='utf-8') as f:
         json.dump(evaluation_metrics, f, indent=2)
     print(f'✅ Evaluation metrics saved: {metrics_file}')
 
@@ -419,7 +426,7 @@ End of Report
 """
 
     report_file = os.path.join(OUTPUT_DIR, 'evaluation_report.txt')
-    with open(report_file, 'w') as f:
+    with open(report_file, 'w', encoding='utf-8') as f:
         f.write(report_content)
     print(f'✅ Evaluation report saved: {report_file}')
 

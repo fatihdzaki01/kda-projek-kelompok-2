@@ -352,3 +352,52 @@ class ACDPTree:
             })
 
         return pd.DataFrame(summary_data)
+
+
+    def export_tree_structure(self):
+        """
+        Export tree structure to JSON-serializable format for visualization.
+        
+        Returns:
+            dict: Tree structure with nodes and their properties
+        """
+        def node_to_dict(node, depth=0):
+            """Convert ACDPTreeNode to dictionary"""
+            if node is None:
+                return None
+            
+            node_dict = {
+                'depth': depth,
+                'is_leaf': node.is_leaf,
+                'record_count': len(node.record_indices),
+                'attribute': node.attribute,
+                'generalization_level': node.generalization_level,
+                'final_levels': node.final_levels if node.is_leaf else None,
+                'children': []
+            }
+            
+            # Add children
+            if not node.is_leaf and node.children:
+                for value, child_node in node.children.items():
+                    child_dict = node_to_dict(child_node, depth + 1)
+                    if child_dict:
+                        child_dict['parent_value'] = str(value)
+                        node_dict['children'].append(child_dict)
+            
+            return node_dict
+        
+        if self.root is None:
+            return None
+        
+        tree_structure = {
+            'metadata': {
+                'k_anonymity': self.k,
+                'max_depth': self.max_depth,
+                'qi_attributes': self.qi_attributes,
+                'sensitive_attribute': self.sensitive_attribute,
+                'total_records': len(self.record_levels)
+            },
+            'tree': node_to_dict(self.root)
+        }
+        
+        return tree_structure
