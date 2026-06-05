@@ -2,10 +2,12 @@
 
 Implementasi **ACDP-Tree (Attribute Correlation Differential Privacy Tree)** berdasarkan penelitian:
 
-> **"Differential Privacy Medical Data Publishing Method Based on Attribute Correlation"**
+> **"Differential Privacy Medical Data Publishing Method Based on Attribute Correlation"**  
 > Zhang & Li, Scientific Reports, Nature, 2022.
 
-## Anggota Kelompok
+---
+
+## 👥 Anggota Kelompok
 
 | Nama | NIM |
 |---|---|
@@ -14,142 +16,163 @@ Implementasi **ACDP-Tree (Attribute Correlation Differential Privacy Tree)** ber
 | Fatih Dzaki Nabhani | L0224042 |
 | Muhammad Darell Hylmi | L0224045 |
 
-## Pipeline
+---
 
-```
-Load CSV → Preprocess → ACE (AHP Ranking) → ACDP Tree (Exp. Mech. + Budget)
-→ KAnonymityEnforcer → Laplace Noise → Evaluate → Save
-```
+## 🚀 Quick Start
 
-## Cara Pakai
-
-### Setup
-
+### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Run dengan dataset default
-
+### 2. Run Backend (Generate Anonymized Data)
 ```bash
 python main.py
 ```
 
-### Run dengan config custom
-
+### 3. Run Frontend (Interactive Dashboard)
 ```bash
-python main.py --config path/to/config.py
+streamlit run frontend/dashboard.py
 ```
 
-### Output folder custom
+Dashboard opens at: **http://localhost:8501**
 
-```bash
-python main.py --output results/my_experiment/
+---
+
+## 📘 Complete Documentation
+
+**👉 See [`DOCUMENTATION.md`](DOCUMENTATION.md) for:**
+- Full setup guide
+- Configuration options
+- Interactive features (upload CSV, custom parameters)
+- Privacy pipeline explanation
+- Dashboard pages overview
+- Troubleshooting
+- Advanced usage
+
+---
+
+## 🔒 Privacy Pipeline
+
+```
+Load CSV → Preprocess → ACE (AHP Ranking) 
+→ ACDP Tree (Exponential Mechanism + Budget)
+→ K-Anonymity Enforcer → Laplace Noise 
+→ Evaluate → Save Results
 ```
 
-### Run unit tests
+**Privacy Guarantees:**
+- ✅ K-Anonymity (k=5 default)
+- ✅ Differential Privacy (ε=1.0 default)
+- ✅ Re-identification risk minimized
 
-```bash
-python -m unittest tests.test_acdp_tree -v
-```
+---
 
-## Struktur File
+## 📂 Project Structure
 
 ```
 .
-├── main.py                         # Pipeline entry point
-├── src/
-│   ├── config.py                   # Dataset & privacy configuration
-│   ├── preprocessing.py            # Data cleaning (missing, duplicates, outliers)
-│   ├── utils.py                    # validate_config(), detect_column_type()
-│   ├── hierarchy.py                # GenericGeneralizationHierarchy (auto-build)
-│   ├── attribute_correlation.py    # ACE: AHP-based attribute ranking
-│   ├── acdp_tree.py                # ACDP Tree + Exponential Mechanism + budget
-│   ├── ace.py                      # KAnonymityEnforcer (k-anonymity safety net)
-│   ├── noise.py                    # Laplace noise + PrivacyBudgetTracker
-│   ├── metrics.py                  # Evaluation metrics (info loss, KL-div, risk)
-│   └── visualization.py            # Plotting functions (parameter-based)
-├── tests/
-│   └── test_acdp_tree.py           # 33 unit tests
-├── data/raw/                       # Input datasets
-├── results/                        # Output results (per-dataset folder)
+├── main.py                    # Backend pipeline
+├── src/                       # Core algorithms
+├── frontend/                  # Streamlit dashboard
+├── data/raw/                  # Input datasets
+├── results/                   # Output results
+├── tests/                     # Unit tests
+├── DOCUMENTATION.md           # 📘 Complete docs
 └── requirements.txt
 ```
 
-## Konfigurasi
+---
+
+## 🎯 Features
+
+### Backend:
+- ✅ Generic pipeline (works with any CSV)
+- ✅ ACE attribute ranking
+- ✅ ACDP Tree with Exponential Mechanism
+- ✅ K-anonymity enforcement
+- ✅ Differential Privacy noise
+- ✅ Comprehensive evaluation metrics
+
+### Frontend Dashboard:
+- ✅ **Interactive Run Anonymization** (upload CSV, configure parameters)
+- ✅ Overview (key metrics, privacy status)
+- ✅ Data Comparison (original vs anonymized)
+- ✅ Privacy Metrics (re-ID risk, DP noise)
+- ✅ Utility Metrics (information loss, KL-divergence)
+- ✅ Visualizations (interactive charts)
+- ✅ Tree Simulation (Laplace noise)
+- ✅ Algorithm Comparison
+
+---
+
+## ⚙️ Configuration
 
 Edit `src/config.py`:
 
 ```python
 DATASET_CONFIG = {
-    'file_path': 'data/raw/dataset.csv',
-    'identifier_attributes': ['Name', 'ID'],    # akan di-drop
-    'qi_attributes': ['Age', 'Sex', 'BMI'],      # akan digeneralisasi
-    'sensitive_attribute': 'Disease',             # target privacy
-    'non_sensitive_attributes': ['Smoker'],       # dibiarkan as-is
+    'file_path': 'data/raw/diabetes__health_indicators.csv',
+    'qi_attributes': ['Age', 'Sex', 'Education', 'Income', 'BMI', 'GenHlth'],
+    'sensitive_attribute': 'Diabetes_012',
 }
 
 PRIVACY_CONFIG = {
-    'k_anonymity': 5,            # k-anonymity parameter
-    'epsilon': 1.0,               # total DP budget (split: ε/2 tree + ε/2 noise)
-    'max_level': 3,               # max generalization depth
-    'max_tree_depth': 4,          # max tree depth
-}
-
-HIERARCHY_CONFIG = {
-    'n_bins_level1': 4,           # bins for continuous at level 1
-    'n_bins_level2': 2,           # bins for continuous at level 2
-    'ordinal_group_size': 4,      # group size for ordinal attributes
-    'top_k_frequent': 10,         # top-k categories for nominal
-}
-
-CUSTOM_HIERARCHY = {
-    # Optional: override auto-detect hierarchy
-    # 'Age': {'type': 'numerical_ordinal', 'mapping': {...}, 'max_level': 3}
+    'k_anonymity': 5,      # Minimum group size
+    'epsilon': 1.0,        # DP budget
+    'max_level': 3,        # Max generalization depth
 }
 ```
 
-## Privacy Budget (ε)
+Or use **interactive dashboard** to configure without editing files!
 
-Total ε dibagi dua:
+---
 
-- **ε/2** → Tree construction (Exponential Mechanism, arithmetic progression per level)
-- **ε/2** → Laplace noise pada leaf node counts
+## 📊 Output
 
-## Komponen Utama
+Results saved to `results/{dataset_name}/`:
+```
+{dataset_name}_anonymized_k5_eps1.0.csv    # Anonymized data
+{dataset_name}_noisy_counts_k5_eps1.0.csv  # Noisy counts
+anonymization_metadata.json                 # Metadata
+evaluation_metrics.json                     # Metrics
+evaluation_report.txt                       # Full report
+```
 
-### ACE (Attribute Correlation Evaluation)
-AHP-based pairwise comparison matrix dengan 3-level importance scale. Menghasilkan ranking QI attributes berdasarkan korelasi terhadap sensitive attribute.
+---
 
-### ACDP Tree
-Generalization optimizer dengan per-record decision. Menggunakan:
-- **Weighted Mutual Information** sebagai split criteria
-- **Exponential Mechanism** untuk split point continuous attributes
-- **Arithmetic progression** budget allocation per tree level
+## 🐛 Troubleshooting
 
-### KAnonymityEnforcer
-Safety net setelah tree: enforce k-anonymity dengan iterative generalization dari original values.
+**Backend fails?**
+```bash
+pip install -r requirements.txt
+```
 
-### Differential Privacy
-Laplace mechanism dengan sensitivity = 1 (count query).
+**Dashboard shows "File not found"?**
+```bash
+# Run backend first to generate data
+python main.py
+```
 
-## Evaluasi Metrics
+**Port 8501 already in use?**
+```bash
+streamlit run frontend/dashboard.py --server.port 8502
+```
 
-- **Information Loss**: unique values lost + entropy reduction
-- **KL-Divergence**: distribution preservation
-- **Re-identification Risk**: unique individuals percentage
-- **Privacy-Utility Tradeoff**: privacy gain vs utility loss
-- **Sensitive Attribute TVD**: distribution change
+**More help:** See [`DOCUMENTATION.md`](DOCUMENTATION.md)
 
-## Output
+---
 
-Semua hasil disimpan di `results/{dataset_name}/`:
+## 📖 Citation
 
 ```
-results/{dataset_name}/
-├── {dataset}_anonymized_k5_eps1.0.csv
-├── {dataset}_noisy_counts_k5_eps1.0.csv
-├── anonymization_metadata.json
-├── evaluation_metrics.json
-└── evaluation_report.txt
+Zhang, X., & Li, Y. (2022). Differential Privacy Medical Data Publishing 
+Method Based on Attribute Correlation. Scientific Reports, Nature.
 ```
+
+---
+
+**📘 For detailed documentation, see [`DOCUMENTATION.md`](DOCUMENTATION.md)**
+
+**Happy Anonymizing! 🔒✨**
+

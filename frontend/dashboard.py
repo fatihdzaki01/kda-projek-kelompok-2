@@ -25,50 +25,129 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Modern Clean CSS
 st.markdown("""
 <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    /* Typography */
+    h1, h2, h3, h4, h5, h6, p, label, div {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    }
+    
+    /* Custom Headers */
     .main-header {
         font-size: 2.5rem;
-        font-weight: bold;
-        color: #1f77b4;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
         text-align: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
     }
+    
     .sub-header {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #2c3e50;
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: #2d3748;
         margin-top: 2rem;
         margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid #667eea;
+        display: inline-block;
     }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
-    }
+    
+    /* Info Boxes */
     .success-box {
-        background-color: #d4edda;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        padding: 1.25rem;
+        border-radius: 10px;
         border-left: 4px solid #28a745;
+        margin: 1rem 0;
     }
+    
     .warning-box {
-        background-color: #fff3cd;
-        padding: 1rem;
-        border-radius: 0.5rem;
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        padding: 1.25rem;
+        border-radius: 10px;
         border-left: 4px solid #ffc107;
+        margin: 1rem 0;
     }
+    
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        padding: 1.25rem;
+        border-radius: 10px;
+        border-left: 4px solid #17a2b8;
+        margin: 1rem 0;
+    }
+    
+    /* Buttons Enhancement */
+    .stButton>button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.6rem 1.5rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(102,126,234,0.3) !important;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 16px rgba(102,126,234,0.4) !important;
+    }
+    
+    /* Metrics Styling */
+    [data-testid="stMetricValue"] {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: #667eea;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-weight: 500;
+        color: #4a5568;
+        font-size: 0.85rem;
+    }
+    
+    /* Progress Bar */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Divider */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #cbd5e0, transparent);
+    }
+    
+    /* Remove Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# Constants
-from src.config import (
-    RAW_DATA_PATH, OUTPUT_DIR,
-    QI_ATTRIBUTES, SENSITIVE_ATTRIBUTE,
-    K_ANONYMITY, EPSILON, MAX_LEVEL
-)
+# Constants - Load from backend config
+from src.config import DATASET_CONFIG, PRIVACY_CONFIG
+
+RAW_DATA_PATH = DATASET_CONFIG['file_path']
+QI_ATTRIBUTES = DATASET_CONFIG['qi_attributes']
+SENSITIVE_ATTRIBUTE = DATASET_CONFIG['sensitive_attribute']
+K_ANONYMITY = PRIVACY_CONFIG['k_anonymity']
+EPSILON = PRIVACY_CONFIG['epsilon']
+MAX_LEVEL = PRIVACY_CONFIG['max_level']
+
+# Determine output directory based on dataset name (matching main.py logic)
+dataset_basename = os.path.splitext(os.path.basename(RAW_DATA_PATH))[0]
+dataset_name = dataset_basename.replace(' ', '_').lower()
+OUTPUT_DIR = os.path.join('results', dataset_name)
 
 # Helper functions
 @st.cache_data
@@ -78,19 +157,21 @@ def load_data():
         # Load original data
         df_original = pd.read_csv(RAW_DATA_PATH)
         
+        # Construct file names based on dataset name (matching main.py logic)
         # Load anonymized data
-        anon_file = f'diabetes_anonymized_k{K_ANONYMITY}_eps{EPSILON:.1f}.csv'
+        anon_file = f'{dataset_name}_anonymized_k{K_ANONYMITY}_eps{EPSILON:.1f}.csv'
         anon_path = os.path.join(OUTPUT_DIR, anon_file)
         df_anonymized = pd.read_csv(anon_path)
         
         # Load noisy counts
-        noisy_file = f'diabetes_noisy_counts_k{K_ANONYMITY}_eps{EPSILON:.1f}.csv'
+        noisy_file = f'{dataset_name}_noisy_counts_k{K_ANONYMITY}_eps{EPSILON:.1f}.csv'
         noisy_path = os.path.join(OUTPUT_DIR, noisy_file)
         df_noisy = pd.read_csv(noisy_path)
         
         return df_original, df_anonymized, df_noisy, True
     except Exception as e:
         st.error(f"Error loading data: {e}")
+        st.error(f"Expected paths:\n- {anon_path}\n- {noisy_path}")
         return None, None, None, False
 
 def calculate_metrics(df_original, df_anonymized):
@@ -117,6 +198,548 @@ def calculate_metrics(df_original, df_anonymized):
     
     return info_loss, dist_preserve, orig_risk, anon_risk, tradeoff
 
+def show_run_anonymization():
+    """Interactive page to run anonymization on custom CSV"""
+    st.markdown('<div class="sub-header">🏠 Run Anonymization</div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    **Upload your CSV file and configure privacy parameters to run ACDP Tree anonymization.**
+    
+    Default dataset: Diabetes Health Indicators
+    """)
+    
+    # File uploader
+    st.markdown("---")
+    st.markdown("### 📤 Upload CSV File")
+    
+    uploaded_file = st.file_uploader(
+        "Choose a CSV file",
+        type=['csv'],
+        help="Upload your dataset in CSV format"
+    )
+    
+    # Use default or uploaded file
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        dataset_source = uploaded_file.name
+        st.success(f"✅ Loaded: **{uploaded_file.name}** ({len(df):,} rows, {len(df.columns)} columns)")
+    else:
+        df = pd.read_csv(RAW_DATA_PATH)
+        dataset_source = "diabetes__health_indicators.csv (default)"
+        st.info(f"📊 Using default dataset: **{dataset_source}** ({len(df):,} rows, {len(df.columns)} columns)")
+    
+    # Show data preview
+    with st.expander("👀 Preview Data (first 10 rows)"):
+        st.dataframe(df.head(10), use_container_width=True)
+    
+    # Configuration
+    st.markdown("---")
+    st.markdown("### ⚙️ Configuration")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### 🔢 Attribute Selection")
+        
+        # Detect column types
+        numerical_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+        all_cols = df.columns.tolist()
+        
+        # QI Attributes
+        qi_attrs = st.multiselect(
+            "Quasi-Identifier (QI) Attributes",
+            options=all_cols,
+            default=QI_ATTRIBUTES if set(QI_ATTRIBUTES).issubset(all_cols) else all_cols[:min(6, len(all_cols))],
+            help="Attributes used for generalization (usually demographic attributes)"
+        )
+        
+        # Sensitive Attribute
+        sens_attr = st.selectbox(
+            "Sensitive Attribute",
+            options=[col for col in all_cols if col not in qi_attrs],
+            index=0 if SENSITIVE_ATTRIBUTE not in all_cols else [col for col in all_cols if col not in qi_attrs].index(SENSITIVE_ATTRIBUTE) if SENSITIVE_ATTRIBUTE in [col for col in all_cols if col not in qi_attrs] else 0,
+            help="The attribute to protect (e.g., disease, salary)"
+        )
+        
+        # Identifier Attributes (optional)
+        id_attrs = st.multiselect(
+            "Identifier Attributes (will be dropped)",
+            options=[col for col in all_cols if col not in qi_attrs and col != sens_attr],
+            default=[],
+            help="Attributes like ID, Name that directly identify individuals"
+        )
+    
+    with col2:
+        st.markdown("#### 🔒 Privacy Parameters")
+        
+        k_anon = st.slider(
+            "K-Anonymity (k)",
+            min_value=2,
+            max_value=20,
+            value=K_ANONYMITY,
+            step=1,
+            help="Minimum group size. Higher k = more privacy, less utility"
+        )
+        
+        epsilon = st.slider(
+            "Differential Privacy (ε)",
+            min_value=0.1,
+            max_value=5.0,
+            value=float(EPSILON),
+            step=0.1,
+            help="Privacy budget. Lower ε = more privacy, more noise"
+        )
+        
+        max_level = st.slider(
+            "Max Generalization Level",
+            min_value=1,
+            max_value=5,
+            value=MAX_LEVEL,
+            step=1,
+            help="Maximum level of generalization for each attribute"
+        )
+        
+        max_tree_depth = st.slider(
+            "Max Tree Depth",
+            min_value=2,
+            max_value=10,
+            value=4,
+            step=1,
+            help="Maximum depth of ACDP Tree"
+        )
+    
+    # Validation
+    st.markdown("---")
+    
+    if len(qi_attrs) == 0:
+        st.error("⚠️ Please select at least one QI attribute")
+        return
+    
+    if sens_attr is None:
+        st.error("⚠️ Please select a sensitive attribute")
+        return
+    
+    # Show configuration summary
+    with st.expander("📋 Configuration Summary"):
+        config_summary = {
+            "Dataset": dataset_source,
+            "Records": f"{len(df):,}",
+            "Columns": len(df.columns),
+            "QI Attributes": ", ".join(qi_attrs),
+            "Sensitive Attribute": sens_attr,
+            "Identifier Attributes": ", ".join(id_attrs) if id_attrs else "None",
+            "K-Anonymity": k_anon,
+            "Epsilon": epsilon,
+            "Max Level": max_level,
+            "Max Tree Depth": max_tree_depth
+        }
+        st.json(config_summary)
+    
+    # Run button
+    st.markdown("---")
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        run_button = st.button("▶️ Run Anonymization", use_container_width=True, type="primary")
+    
+    if run_button:
+        st.markdown("---")
+        st.markdown("### 🔄 Running Anonymization Pipeline...")
+        
+        # Save uploaded file temporarily
+        import tempfile
+        import shutil
+        
+        temp_dir = tempfile.mkdtemp()
+        temp_csv = os.path.join(temp_dir, "temp_dataset.csv")
+        df.to_csv(temp_csv, index=False)
+        
+        # Create config
+        custom_config = {
+            'file_path': temp_csv,
+            'identifier_attributes': id_attrs,
+            'qi_attributes': qi_attrs,
+            'sensitive_attribute': sens_attr,
+            'non_sensitive_attributes': [],
+        }
+        
+        custom_privacy = {
+            'k_anonymity': k_anon,
+            'epsilon': epsilon,
+            'max_level': max_level,
+            'max_tree_depth': max_tree_depth,
+        }
+        
+        # Output directory
+        output_name = os.path.splitext(dataset_source)[0].replace(' ', '_').lower()
+        custom_output = os.path.join('results', output_name)
+        
+        # Progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        try:
+            # Import backend
+            from main import run_pipeline
+            from src.config import HIERARCHY_CONFIG
+            
+            status_text.text("⏳ Step 1/7: Preprocessing data...")
+            progress_bar.progress(10)
+            
+            # Capture output
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            output_buffer = io.StringIO()
+            
+            with redirect_stdout(output_buffer), redirect_stderr(output_buffer):
+                results = run_pipeline(
+                    config=custom_config,
+                    privacy_config=custom_privacy,
+                    hierarchy_config=HIERARCHY_CONFIG,
+                    custom_hierarchy={},
+                    output_dir=custom_output
+                )
+            
+            progress_bar.progress(100)
+            status_text.text("✅ Anonymization complete!")
+            
+            # Show results
+            st.success("🎉 **Anonymization completed successfully!**")
+            
+            # Get result data
+            metadata = results['metadata']
+            df_original = results['df_original']
+            df_anonymized = results['df_anonymized']
+            metrics = results['metrics']
+            
+            # Display summary metrics
+            st.markdown("---")
+            st.markdown("### 📊 Results Summary")
+            
+            col1, col2, col3, col4, col5 = st.columns(5)
+            
+            with col1:
+                st.metric("Original Records", f"{metadata['dataset_info']['original_records']:,}")
+            
+            with col2:
+                st.metric("K-Anonymity", "✅ Satisfied" if metadata['privacy_guarantees']['k_anonymity_satisfied'] else "❌ Not Satisfied")
+            
+            with col3:
+                utility = metrics['privacy_utility_tradeoff']['utility_score']
+                st.metric("Utility Score", f"{utility:.2f}/100")
+            
+            with col4:
+                st.metric("Unique Groups", f"{metadata['privacy_guarantees']['total_groups']:,}")
+            
+            with col5:
+                privacy_gain = metrics['privacy_utility_tradeoff']['privacy_gain_pct']
+                st.metric("Privacy Gain", f"{privacy_gain:.1f}%")
+            
+            # Privacy Guarantees
+            st.markdown("---")
+            st.markdown("### 🔐 Privacy Guarantees")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown('<div class="success-box">', unsafe_allow_html=True)
+                st.markdown(f"**✅ K-Anonymity Satisfied (k={k_anon})**")
+                st.markdown(f"- Min group size: **{metadata['privacy_guarantees']['min_group_size']}**")
+                st.markdown(f"- Max group size: **{metadata['privacy_guarantees']['max_group_size']:,}**")
+                st.markdown(f"- Avg group size: **{metadata['privacy_guarantees']['avg_group_size']:.2f}**")
+                st.markdown(f"- Total equivalence classes: **{metadata['privacy_guarantees']['total_groups']:,}**")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown('<div class="success-box">', unsafe_allow_html=True)
+                st.markdown(f"**✅ Differential Privacy (ε={epsilon})**")
+                st.markdown(f"- Tree construction budget: **ε={epsilon/2:.2f}**")
+                st.markdown(f"- Laplace noise budget: **ε={epsilon/2:.2f}**")
+                st.markdown(f"- Mean noise: **{metadata['pipeline_summary']['noise']['mean_noise']:.4f}**")
+                st.markdown(f"- Mean percent error: **{metadata['pipeline_summary']['noise']['mean_percent_error']:.2f}%**")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # ACDP Tree Visualization
+            st.markdown("---")
+            st.markdown("### 🌳 ACDP Tree Structure")
+            
+            # Load tree structure
+            tree_file = os.path.join(custom_output, 'acdp_tree_structure.json')
+            if os.path.exists(tree_file):
+                with open(tree_file, 'r') as f:
+                    tree_data = json.load(f)
+                
+                # Create tree visualization
+                import plotly.graph_objects as go
+                
+                def create_tree_nodes(node, parent_id="", x=0, y=0, level=0, width=1.0):
+                    """Recursively create tree nodes for visualization"""
+                    nodes = []
+                    edges = []
+                    
+                    if node is None:
+                        return nodes, edges
+                    
+                    node_id = f"{parent_id}_{level}_{x}"
+                    
+                    # Node info
+                    if node.get('is_leaf', False):
+                        node_label = f"LEAF<br>Records: {node.get('record_count', 0)}"
+                        node_color = '#28a745'  # Green for leaf
+                    else:
+                        attr = node.get('attribute', 'Unknown')
+                        gen_level = node.get('generalization_level', 0)
+                        node_label = f"{attr}<br>Level: {gen_level}<br>Records: {node.get('record_count', 0)}"
+                        node_color = '#667eea'  # Purple for decision node
+                    
+                    nodes.append({
+                        'id': node_id,
+                        'label': node_label,
+                        'x': x,
+                        'y': -y,
+                        'color': node_color,
+                        'size': min(30 + node.get('record_count', 0) / 10000, 50)
+                    })
+                    
+                    # Process children
+                    children = node.get('children', [])
+                    if children:
+                        child_width = width / len(children)
+                        for i, child in enumerate(children):
+                            child_x = x - width/2 + child_width * (i + 0.5)
+                            child_y = y + 1
+                            
+                            child_nodes, child_edges = create_tree_nodes(
+                                child, node_id, child_x, child_y, level + 1, child_width
+                            )
+                            
+                            # Add edge
+                            child_id = f"{node_id}_{level+1}_{child_x}"
+                            edges.append({
+                                'from': node_id,
+                                'to': child_id,
+                                'parent_value': child.get('parent_value', '')
+                            })
+                            
+                            nodes.extend(child_nodes)
+                            edges.extend(child_edges)
+                    
+                    return nodes, edges
+                
+                # Create visualization
+                tree_root = tree_data.get('tree')
+                if tree_root:
+                    nodes, edges = create_tree_nodes(tree_root, "", 0, 0, 0, 2.0)
+                    
+                    # Create Plotly figure
+                    fig = go.Figure()
+                    
+                    # Add edges
+                    for edge in edges:
+                        from_node = next((n for n in nodes if n['id'] == edge['from']), None)
+                        to_node = next((n for n in nodes if n['id'] == edge['to']), None)
+                        
+                        if from_node and to_node:
+                            fig.add_trace(go.Scatter(
+                                x=[from_node['x'], to_node['x']],
+                                y=[from_node['y'], to_node['y']],
+                                mode='lines',
+                                line=dict(color='#cbd5e0', width=2),
+                                hoverinfo='skip',
+                                showlegend=False
+                            ))
+                    
+                    # Add nodes
+                    node_x = [n['x'] for n in nodes]
+                    node_y = [n['y'] for n in nodes]
+                    node_text = [n['label'] for n in nodes]
+                    node_color = [n['color'] for n in nodes]
+                    node_size = [n['size'] for n in nodes]
+                    
+                    fig.add_trace(go.Scatter(
+                        x=node_x,
+                        y=node_y,
+                        mode='markers+text',
+                        marker=dict(
+                            size=node_size,
+                            color=node_color,
+                            line=dict(color='white', width=2)
+                        ),
+                        text=node_text,
+                        textposition="middle center",
+                        textfont=dict(size=10, color='white'),
+                        hoverinfo='text',
+                        showlegend=False
+                    ))
+                    
+                    fig.update_layout(
+                        title=f"ACDP Tree Structure (Depth: {tree_data['metadata']['max_depth']}, Total Records: {tree_data['metadata']['total_records']:,})",
+                        showlegend=False,
+                        hovermode='closest',
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        height=600,
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)'
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    with st.expander("🔍 Tree Metadata"):
+                        st.json(tree_data['metadata'])
+                else:
+                    st.warning("⚠️ Tree structure is empty")
+            else:
+                st.warning("⚠️ ACDP Tree structure file not found")
+            
+            # Information Loss Visualization
+            st.markdown("---")
+            st.markdown("### 📉 Information Loss Analysis")
+            
+            info_loss_df = metrics['information_loss']
+            info_loss_chart = pd.DataFrame(info_loss_df)
+            
+            fig_info_loss = go.Figure()
+            fig_info_loss.add_trace(go.Bar(
+                x=info_loss_chart['Attribute'],
+                y=info_loss_chart['Unique Lost (%)'],
+                name='Unique Values Lost (%)',
+                marker_color='#e74c3c'
+            ))
+            fig_info_loss.add_trace(go.Bar(
+                x=info_loss_chart['Attribute'],
+                y=info_loss_chart['Entropy Reduction (%)'],
+                name='Entropy Reduction (%)',
+                marker_color='#f39c12'
+            ))
+            
+            fig_info_loss.update_layout(
+                barmode='group',
+                height=400,
+                xaxis_title='Attribute',
+                yaxis_title='Loss (%)',
+                title='Information Loss by Attribute'
+            )
+            
+            st.plotly_chart(fig_info_loss, use_container_width=True)
+            
+            # Distribution Comparison
+            st.markdown("---")
+            st.markdown("### 📊 Distribution Comparison")
+            
+            # Select attribute for comparison
+            comparison_attr = st.selectbox(
+                "Select attribute to compare:",
+                qi_attrs,
+                key="run_comparison"
+            )
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Original Distribution**")
+                orig_dist = df_original[comparison_attr].value_counts().head(10)
+                fig_orig = px.bar(
+                    x=orig_dist.index.astype(str),
+                    y=orig_dist.values,
+                    labels={'x': comparison_attr, 'y': 'Count'},
+                    color_discrete_sequence=['#3498db']
+                )
+                fig_orig.update_layout(height=350, showlegend=False)
+                st.plotly_chart(fig_orig, use_container_width=True)
+            
+            with col2:
+                st.markdown("**Anonymized Distribution**")
+                anon_dist = df_anonymized[comparison_attr].value_counts().head(10)
+                fig_anon = px.bar(
+                    x=anon_dist.index.astype(str),
+                    y=anon_dist.values,
+                    labels={'x': comparison_attr, 'y': 'Count'},
+                    color_discrete_sequence=['#9b59b6']
+                )
+                fig_anon.update_layout(height=350, showlegend=False)
+                st.plotly_chart(fig_anon, use_container_width=True)
+            
+            # Data Preview
+            st.markdown("---")
+            st.markdown("### 👀 Data Preview")
+            
+            tab1, tab2 = st.tabs(["Original Data", "Anonymized Data"])
+            
+            with tab1:
+                st.dataframe(df_original.head(20), use_container_width=True)
+            
+            with tab2:
+                st.dataframe(df_anonymized.head(20), use_container_width=True)
+            
+            # Output Files
+            st.markdown("---")
+            st.markdown("### 📁 Output Files")
+            st.info(f"✅ Results saved to: `{custom_output}/`")
+            
+            output_files = [
+                f"✅ {metadata['dataset_info']['anonymized_file']} - Anonymized dataset",
+                f"✅ {metadata['dataset_info']['noisy_counts_file']} - Noisy counts",
+                f"✅ acdp_tree_structure.json - Tree structure",
+                f"✅ anonymization_metadata.json - Metadata",
+                f"✅ evaluation_metrics.json - Evaluation metrics",
+                f"✅ evaluation_report.txt - Detailed report"
+            ]
+            
+            for file_info in output_files:
+                st.markdown(f"- {file_info}")
+            
+            # Console Output
+            with st.expander("📋 Console Output (Terminal)"):
+                st.code(output_buffer.getvalue(), language='text')
+            
+            # Cleanup
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+            st.markdown("---")
+            st.success("💡 **Anonymization complete!** Scroll up to see ACDP Tree visualization and detailed metrics.")
+            
+        except ValueError as e:
+            progress_bar.progress(0)
+            status_text.text("")
+            error_msg = str(e)
+            
+            # Provide helpful error messages
+            if "not found in dataset columns" in error_msg:
+                st.error("❌ **Configuration Error:** Some selected attributes don't exist in your CSV.")
+                st.warning("**Solution:** Check the attribute names and try again. Make sure you're selecting from the dropdown options only.")
+            elif "No valid QI attributes" in error_msg:
+                st.error("❌ **Configuration Error:** No valid QI attributes found.")
+                st.warning("**Solution:** Select at least one valid attribute as QI.")
+            elif "not enough values to unpack" in error_msg or "reshape" in error_msg:
+                st.error("❌ **Data Format Error:** Dataset format is not compatible.")
+                st.warning("**Solution:** Ensure your CSV has:\n- At least 100 rows\n- Valid numeric or categorical columns\n- No completely empty columns")
+            else:
+                st.error(f"❌ **Error during anonymization:** {error_msg}")
+            
+            with st.expander("🐛 Full Error Details"):
+                import traceback
+                st.code(traceback.format_exc())
+            
+            # Cleanup
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+        except Exception as e:
+            progress_bar.progress(0)
+            status_text.text("")
+            st.error(f"❌ **Unexpected error:** {str(e)}")
+            st.warning("**Your dataset might have:**\n- Special characters or encoding issues\n- Extremely sparse data\n- Unusual data types\n\nTry cleaning your CSV first or contact support.")
+            
+            with st.expander("🐛 Full Error Details"):
+                import traceback
+                st.code(traceback.format_exc())
+            
+            # Cleanup
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 # Main app
 def main():
     # Header
@@ -138,7 +761,7 @@ def main():
     st.sidebar.title("📊 Navigation")
     page = st.sidebar.radio(
         "Select View:",
-        ["Overview", "Data Comparison", "Privacy Metrics", "Utility Metrics", "Visualizations", "Tree Simulation", "Algorithm Comparison"]
+        ["🏠 Run Anonymization", "Overview", "Data Comparison", "Privacy Metrics", "Utility Metrics", "Visualizations", "Tree Simulation", "Algorithm Comparison"]
     )
     
     st.sidebar.markdown("---")
@@ -157,7 +780,9 @@ def main():
     info_loss, dist_preserve, orig_risk, anon_risk, tradeoff = calculate_metrics(df_original, df_anonymized)
     
     # Page routing
-    if page == "Overview":
+    if page == "🏠 Run Anonymization":
+        show_run_anonymization()
+    elif page == "Overview":
         show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, tradeoff)
     elif page == "Data Comparison":
         show_data_comparison(df_original, df_anonymized)

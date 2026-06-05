@@ -21,29 +21,59 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
     results = []
 
     for attr in qi_attributes:
-        orig_unique = df_original[attr].nunique()
-        anon_unique = df_anonymized[attr].nunique()
+        try:
+            # Handle missing attributes
+            if attr not in df_original.columns or attr not in df_anonymized.columns:
+                continue
+            
+            orig_unique = df_original[attr].nunique()
+            anon_unique = df_anonymized[attr].nunique()
 
-        unique_lost_pct = (1 - anon_unique / orig_unique) * 100
+            # Handle zero unique values
+            if orig_unique == 0:
+                unique_lost_pct = 0.0
+            else:
+                unique_lost_pct = (1 - anon_unique / orig_unique) * 100
 
-        orig_entropy = -sum(
-            (df_original[attr].value_counts(normalize=True) *
-             np.log2(df_original[attr].value_counts(normalize=True) + 1e-10))
-        )
-        anon_entropy = -sum(
-            (df_anonymized[attr].value_counts(normalize=True) *
-             np.log2(df_anonymized[attr].value_counts(normalize=True) + 1e-10))
-        )
+            # Handle entropy calculation
+            orig_value_counts = df_original[attr].value_counts(normalize=True)
+            anon_value_counts = df_anonymized[attr].value_counts(normalize=True)
+            
+            if len(orig_value_counts) == 0:
+                orig_entropy = 0.0
+            else:
+                orig_entropy = -sum(
+                    (orig_value_counts * np.log2(orig_value_counts + 1e-10))
+                )
+            
+            if len(anon_value_counts) == 0:
+                anon_entropy = 0.0
+            else:
+                anon_entropy = -sum(
+                    (anon_value_counts * np.log2(anon_value_counts + 1e-10))
+                )
 
-        entropy_reduction = (1 - anon_entropy / (orig_entropy + 1e-10)) * 100
+            if orig_entropy == 0:
+                entropy_reduction = 0.0
+            else:
+                entropy_reduction = (1 - anon_entropy / orig_entropy) * 100
 
-        results.append({
-            'Attribute': attr,
-            'Original Unique': orig_unique,
-            'Anonymized Unique': anon_unique,
-            'Unique Lost (%)': round(unique_lost_pct, 2),
-            'Entropy Reduction (%)': round(entropy_reduction, 2),
-        })
+            results.append({
+                'Attribute': attr,
+                'Original Unique': orig_unique,
+                'Anonymized Unique': anon_unique,
+                'Unique Lost (%)': round(unique_lost_pct, 2),
+                'Entropy Reduction (%)': round(entropy_reduction, 2),
+            })
+        except Exception as e:
+            print(f"  Warning: Failed to calculate information loss for '{attr}': {e}")
+            results.append({
+                'Attribute': attr,
+                'Original Unique': 0,
+                'Anonymized Unique': 0,
+                'Unique Lost (%)': 0.0,
+                'Entropy Reduction (%)': 0.0,
+            })
 
     return pd.DataFrame(results)
 
@@ -55,33 +85,63 @@ def calculate_kl_divergence(df_original, df_anonymized, qi_attributes):
 
     Lower = better (distribusi lebih terjaga)
     """
+    import numpy as np
     results = []
 
     for attr in qi_attributes:
-        orig_dist = df_original[attr].value_counts(normalize=True)
-        anon_dist = df_anonymized[attr].value_counts(normalize=True)
+        try:
+            # Handle missing attributes
+            if attr not in df_original.columns or attr not in df_anonymized.columns:
+                continue
+            
+            orig_dist = df_original[attr].value_counts(normalize=True)
+            anon_dist = df_anonymized[attr].value_counts(normalize=True)
 
-        # Convert index to string untuk avoid type error
-        orig_dist.index = orig_dist.index.astype(str)
-        anon_dist.index = anon_dist.index.astype(str)
+            # Handle empty distributions
+            if len(orig_dist) == 0 or len(anon_dist) == 0:
+                results.append({
+                    'Attribute': attr,
+                    'KL-Divergence': 0.0,
+                    'TVD': 0.0,
+                    'Preservation Quality': 'N/A',
+                })
+                continue
 
-        # Align indices
-        all_values = sorted(set(orig_dist.index) | set(anon_dist.index))
-        orig_aligned = [orig_dist.get(v, 1e-10) for v in all_values]
-        anon_aligned = [anon_dist.get(v, 1e-10) for v in all_values]
+            # Convert index to string untuk avoid type error
+            orig_dist.index = orig_dist.index.astype(str)
+            anon_dist.index = anon_dist.index.astype(str)
 
-        # Calculate KL-divergence
-        kl_div = entropy(orig_aligned, anon_aligned)
+            # Align indices
+            all_values = sorted(set(orig_dist.index) | set(anon_dist.index))
+            orig_aligned = np.array([orig_dist.get(v, 1e-10) for v in all_values])
+            anon_aligned = np.array([anon_dist.get(v, 1e-10) for v in all_values])
 
-        # Total Variation Distance
-        tvd = 0.5 * sum(abs(o - a) for o, a in zip(orig_aligned, anon_aligned))
+            # Normalize to ensure they sum to 1
+            orig_aligned = orig_aligned / (orig_aligned.sum() + 1e-10)
+            anon_aligned = anon_aligned / (anon_aligned.sum() + 1e-10)
 
-        results.append({
-            'Attribute': attr,
-            'KL-Divergence': round(kl_div, 4),
-            'TVD': round(tvd, 4),
-            'Preservation Quality': 'Good' if kl_div < 0.5 else 'Fair' if kl_div < 1.0 else 'Poor',
-        })
+            # Calculate KL-divergence (with safety check)
+            kl_div = entropy(orig_aligned, anon_aligned)
+            if np.isnan(kl_div) or np.isinf(kl_div):
+                kl_div = 0.0
+
+            # Total Variation Distance
+            tvd = 0.5 * np.sum(np.abs(orig_aligned - anon_aligned))
+
+            results.append({
+                'Attribute': attr,
+                'KL-Divergence': round(float(kl_div), 4),
+                'TVD': round(float(tvd), 4),
+                'Preservation Quality': 'Good' if kl_div < 0.5 else 'Fair' if kl_div < 1.0 else 'Poor',
+            })
+        except Exception as e:
+            print(f"  Warning: Failed to calculate KL-divergence for '{attr}': {e}")
+            results.append({
+                'Attribute': attr,
+                'KL-Divergence': 0.0,
+                'TVD': 0.0,
+                'Preservation Quality': 'N/A',
+            })
 
     return pd.DataFrame(results)
 
@@ -95,25 +155,66 @@ def calculate_reidentification_risk(df, qi_attributes):
     2. Percentage of small groups (group size < 5)
     3. Average group size
     """
-    groups = df.groupby(qi_attributes).size()
+    try:
+        # Handle empty dataframe
+        if len(df) == 0:
+            return {
+                'total_groups': 0,
+                'unique_individuals': 0,
+                'small_groups': 0,
+                'unique_risk_pct': 0.0,
+                'small_group_risk_pct': 0.0,
+                'avg_group_size': 0.0,
+                'min_group_size': 0,
+                'max_group_size': 0,
+            }
+        
+        # Filter QI attributes that exist in dataframe
+        valid_qi = [attr for attr in qi_attributes if attr in df.columns]
+        if not valid_qi:
+            print("  Warning: No valid QI attributes found in dataframe")
+            return {
+                'total_groups': 0,
+                'unique_individuals': 0,
+                'small_groups': 0,
+                'unique_risk_pct': 0.0,
+                'small_group_risk_pct': 0.0,
+                'avg_group_size': 0.0,
+                'min_group_size': 0,
+                'max_group_size': 0,
+            }
+        
+        groups = df.groupby(valid_qi).size()
 
-    unique_individuals = (groups == 1).sum()
-    small_groups = (groups < 5).sum()
-    total_groups = len(groups)
+        unique_individuals = (groups == 1).sum()
+        small_groups = (groups < 5).sum()
+        total_groups = len(groups)
 
-    unique_risk = unique_individuals / total_groups * 100 if total_groups > 0 else 0
-    small_group_risk = small_groups / total_groups * 100 if total_groups > 0 else 0
+        unique_risk = unique_individuals / total_groups * 100 if total_groups > 0 else 0
+        small_group_risk = small_groups / total_groups * 100 if total_groups > 0 else 0
 
-    return {
-        'total_groups': total_groups,
-        'unique_individuals': unique_individuals,
-        'small_groups': small_groups,
-        'unique_risk_pct': round(unique_risk, 2),
-        'small_group_risk_pct': round(small_group_risk, 2),
-        'avg_group_size': round(groups.mean(), 2),
-        'min_group_size': int(groups.min()),
-        'max_group_size': int(groups.max()),
-    }
+        return {
+            'total_groups': total_groups,
+            'unique_individuals': unique_individuals,
+            'small_groups': small_groups,
+            'unique_risk_pct': round(unique_risk, 2),
+            'small_group_risk_pct': round(small_group_risk, 2),
+            'avg_group_size': round(groups.mean(), 2) if len(groups) > 0 else 0.0,
+            'min_group_size': int(groups.min()) if len(groups) > 0 else 0,
+            'max_group_size': int(groups.max()) if len(groups) > 0 else 0,
+        }
+    except Exception as e:
+        print(f"  Warning: Failed to calculate re-identification risk: {e}")
+        return {
+            'total_groups': 0,
+            'unique_individuals': 0,
+            'small_groups': 0,
+            'unique_risk_pct': 0.0,
+            'small_group_risk_pct': 0.0,
+            'avg_group_size': 0.0,
+            'min_group_size': 0,
+            'max_group_size': 0,
+        }
 
 
 def calculate_privacy_utility_tradeoff(

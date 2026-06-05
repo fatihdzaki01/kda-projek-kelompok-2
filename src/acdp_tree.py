@@ -14,10 +14,12 @@ def weighted_mutual_info(feature, target, weights):
     """
     Hitung Weighted Mutual Information antara feature dan target.
     Digunakan sebagai split criteria di ACDP Tree.
+    
+    Handles both discrete and continuous target variables.
 
     Args:
         feature  : pd.Series -> nilai fitur (QI attribute)
-        target   : pd.Series -> sensitive attribute
+        target   : pd.Series -> sensitive attribute (discrete or continuous)
         weights  : pd.Series -> bobot per record
 
     Returns:
@@ -28,17 +30,47 @@ def weighted_mutual_info(feature, target, weights):
         return 0.0
 
     def weighted_entropy(t, w):
-        """Hitung entropy berbobot"""
+        """Hitung entropy berbobot (handles continuous via binning)"""
         w_total = w.sum()
         if w_total == 0:
             return 0.0
-        classes = t.unique()
-        entropy = 0.0
-        for c in classes:
-            mask = (t == c)
-            p = w[mask].sum() / w_total
-            if p > 0:
-                entropy -= p * np.log2(p)
+        
+        # Check if target is continuous
+        n_unique = t.nunique()
+        is_continuous = (pd.api.types.is_float_dtype(t) and n_unique > 20) or (n_unique > len(t) * 0.5)
+        
+        if is_continuous:
+            # For continuous target, bin the values
+            n_bins = min(20, max(5, len(t) // 100))
+            try:
+                t_binned = pd.cut(t, bins=n_bins, duplicates='drop')
+                classes = t_binned.cat.categories
+                entropy = 0.0
+                for c in classes:
+                    mask = (t_binned == c)
+                    if mask.sum() > 0:
+                        p = w[mask].sum() / w_total
+                        if p > 0:
+                            entropy -= p * np.log2(p)
+            except Exception:
+                # Fallback: treat as discrete
+                classes = t.unique()
+                entropy = 0.0
+                for c in classes:
+                    mask = (t == c)
+                    p = w[mask].sum() / w_total
+                    if p > 0:
+                        entropy -= p * np.log2(p)
+        else:
+            # For discrete target
+            classes = t.unique()
+            entropy = 0.0
+            for c in classes:
+                mask = (t == c)
+                p = w[mask].sum() / w_total
+                if p > 0:
+                    entropy -= p * np.log2(p)
+        
         return entropy
 
     h_target = weighted_entropy(target, weights)
@@ -69,9 +101,25 @@ def compute_inverse_frequency_weights(df, target_col):
     Returns:
         pd.Series -> bobot per record (index sama dengan df)
     """
-    counts = Counter(df[target_col])
+    # Handle edge cases
+    if len(df) == 0:
+        return pd.Series([], dtype=float)
+    
+    if target_col not in df.columns:
+        print(f'  Warning: Target column "{target_col}" not found, using uniform weights')
+        return pd.Series(np.ones(len(df)), index=df.index)
+    
+    # Handle NaN values in target
+    if df[target_col].isna().all():
+        print(f'  Warning: All values in "{target_col}" are NaN, using uniform weights')
+        return pd.Series(np.ones(len(df)), index=df.index)
+    
+    counts = Counter(df[target_col].dropna())
     total = len(df)
     n_cls = len(counts)
+    
+    if n_cls == 0:
+        return pd.Series(np.ones(len(df)), index=df.index)
 
     class_weights = {
         cls: total / (n_cls * cnt)
@@ -79,13 +127,16 @@ def compute_inverse_frequency_weights(df, target_col):
     }
 
     weights = df[target_col].map(class_weights)
+    
+    # Fill NaN weights with 1.0
+    weights = weights.fillna(1.0)
 
     print('Inverse Frequency Weights:')
     print('=' * 40)
     for cls, w in sorted(class_weights.items()):
         cnt = counts[cls]
         pct = cnt / total * 100
-        print(f'  Kelas {int(cls)}: count={cnt:,} ({pct:.1f}%) -> weight={w:.4f}')
+        print(f'  Kelas {cls}: count={cnt:,} ({pct:.1f}%) -> weight={w:.4f}')
     print('=' * 40)
 
     return weights

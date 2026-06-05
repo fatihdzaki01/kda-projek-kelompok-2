@@ -9,25 +9,96 @@ import numpy as np
 def detect_column_type(series):
     """
     Auto-detect column type for generalization hierarchy.
+    
+    Robust detection for:
+    - Dates/timestamps
+    - Mixed types
+    - Numeric strings
+    - Boolean values
+    - Special characters
 
     Returns:
         str: 'numerical_continuous', 'numerical_ordinal',
-             'categorical_binary', 'categorical_nominal'
+             'categorical_binary', 'categorical_nominal',
+             'datetime', 'text'
     """
+    # Handle empty series
+    if len(series) == 0 or series.dropna().empty:
+        return 'categorical_nominal'
+    
     n_unique = series.nunique()
+    n_total = len(series.dropna())
     dtype = series.dtype
-
+    
+    # Binary (2 unique values)
     if n_unique == 2:
         return 'categorical_binary'
-    elif dtype == 'object' or dtype.name == 'category':
+    
+    # Check if datetime
+    if pd.api.types.is_datetime64_any_dtype(series):
+        return 'datetime'
+    
+    # Try to parse as datetime if string
+    if dtype == 'object':
+        try:
+            pd.to_datetime(series.dropna().head(100), errors='raise')
+            return 'datetime'
+        except:
+            pass
+    
+    # Object/string types
+    if dtype == 'object' or dtype.name == 'category':
+        # Try to convert to numeric
+        try:
+            numeric_series = pd.to_numeric(series.dropna(), errors='coerce')
+            non_null_ratio = numeric_series.notna().sum() / len(numeric_series)
+            
+            # If >80% can be converted to numeric, treat as numeric
+            if non_null_ratio > 0.8:
+                if numeric_series.apply(lambda x: x == int(x) if pd.notna(x) else True).all():
+                    # All integers
+                    if n_unique <= 20:
+                        return 'numerical_ordinal'
+                    else:
+                        return 'numerical_continuous'
+                else:
+                    # Has floats
+                    return 'numerical_continuous'
+        except:
+            pass
+        
+        # Check if text (long strings)
+        avg_len = series.astype(str).str.len().mean()
+        if avg_len > 50:  # Average length > 50 chars = likely text/description
+            return 'text'
+        
+        # Default: categorical nominal
         return 'categorical_nominal'
+    
+    # Boolean
+    elif pd.api.types.is_bool_dtype(series):
+        return 'categorical_binary'
+    
+    # Float types
     elif dtype in ['float32', 'float64']:
-        return 'numerical_continuous'
+        # Check if actually integer (e.g., 1.0, 2.0, 3.0)
+        if series.dropna().apply(lambda x: x == int(x)).all():
+            if n_unique <= 20:
+                return 'numerical_ordinal'
+            else:
+                return 'numerical_continuous'
+        else:
+            return 'numerical_continuous'
+    
+    # Integer types
     elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
-        if n_unique <= 20:
+        # Ordinal: limited unique values (e.g., ratings 1-5, age groups)
+        if n_unique <= 20 or n_unique < n_total * 0.1:
             return 'numerical_ordinal'
         else:
             return 'numerical_continuous'
+    
+    # Default fallback
     else:
         return 'categorical_nominal'
 

@@ -110,7 +110,23 @@ def run_pipeline(config=None, privacy_config=None, hierarchy_config=None,
     if errors:
         for e in errors:
             print(f'  ERROR: {e}')
-        raise ValueError(f'Config validation failed: {errors}')
+        # Don't raise immediately - try to auto-fix
+        print(f'  Attempting auto-fix...')
+        
+        # Auto-fix: Remove invalid QI attributes
+        valid_qi = [attr for attr in qi_attributes if attr in df_clean.columns]
+        if len(valid_qi) < len(qi_attributes):
+            print(f'  Auto-fixed: Using only valid QI attributes: {valid_qi}')
+            qi_attributes = valid_qi
+            config['qi_attributes'] = valid_qi
+        
+        # Check again
+        if len(qi_attributes) == 0:
+            raise ValueError('No valid QI attributes found in dataset!')
+        
+        if sensitive_attr not in df_clean.columns:
+            raise ValueError(f'Sensitive attribute "{sensitive_attr}" not found in dataset!')
+    
     if warnings_list:
         for w in warnings_list:
             print(f'  Warning: {w}')
@@ -168,6 +184,13 @@ def run_pipeline(config=None, privacy_config=None, hierarchy_config=None,
     groups = df_generalized.groupby(qi_attributes).size()
     n_violations = (groups < k).sum()
     print(f'\n  After ACDP Tree: {n_violations} violation groups')
+
+    # Export tree structure for visualization
+    tree_structure_file = os.path.join(output_dir, 'acdp_tree_structure.json')
+    tree_structure = acdp_tree.export_tree_structure()
+    with open(tree_structure_file, 'w', encoding='utf-8') as f:
+        json.dump(tree_structure, f, indent=2)
+    print(f'  Tree structure exported: {tree_structure_file}')
 
     # ================================================================
     # STEP 6: K-Anonymity Enforcer

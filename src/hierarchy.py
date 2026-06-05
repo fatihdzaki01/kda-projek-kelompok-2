@@ -55,6 +55,13 @@ class GenericGeneralizationHierarchy:
                 self._build_binary_hierarchy(df[attr], attr)
             elif col_type == 'categorical_nominal':
                 self._build_nominal_hierarchy(df[attr], attr, hierarchy_config)
+            elif col_type == 'datetime':
+                self._build_datetime_hierarchy(df[attr], attr, hierarchy_config)
+            elif col_type == 'text':
+                self._build_text_hierarchy(df[attr], attr, hierarchy_config)
+            else:
+                # Fallback: treat as nominal
+                self._build_nominal_hierarchy(df[attr], attr, hierarchy_config)
 
     # ------------------------------------------------------------------ #
     # Hierarchy builders
@@ -161,6 +168,76 @@ class GenericGeneralizationHierarchy:
             'max_level': 3,
         }
         self.max_levels[attr] = 3
+
+    def _build_datetime_hierarchy(self, series, attr, config):
+        """Datetime: Year -> Year-Quarter -> Year-Month."""
+        try:
+            dt_series = pd.to_datetime(series, errors='coerce')
+            unique_dates = dt_series.dropna().unique()
+            
+            # Level 1: Year-Month (e.g., "2023-01")
+            mapping_1 = {}
+            for dt in unique_dates:
+                dt_obj = pd.Timestamp(dt)
+                mapping_1[dt] = f"{dt_obj.year}-{dt_obj.month:02d}"
+            
+            # Level 2: Year-Quarter (e.g., "2023-Q1")
+            mapping_2 = {}
+            for dt in unique_dates:
+                dt_obj = pd.Timestamp(dt)
+                quarter = (dt_obj.month - 1) // 3 + 1
+                mapping_2[dt] = f"{dt_obj.year}-Q{quarter}"
+            
+            # Also map original string values if they exist
+            for orig_val in series.dropna().unique():
+                if orig_val not in mapping_1:
+                    try:
+                        dt_obj = pd.Timestamp(orig_val)
+                        mapping_1[orig_val] = f"{dt_obj.year}-{dt_obj.month:02d}"
+                        quarter = (dt_obj.month - 1) // 3 + 1
+                        mapping_2[orig_val] = f"{dt_obj.year}-Q{quarter}"
+                    except:
+                        mapping_1[orig_val] = "Unknown"
+                        mapping_2[orig_val] = "Unknown"
+            
+            self.hierarchies[attr] = {
+                'type': 'datetime',
+                'mapping': {1: mapping_1, 2: mapping_2},
+                'max_level': 3,
+            }
+            self.max_levels[attr] = 3
+        except Exception as e:
+            print(f"  Warning: Failed to build datetime hierarchy for '{attr}': {e}")
+            # Fallback to nominal
+            self._build_nominal_hierarchy(series, attr, config)
+
+    def _build_text_hierarchy(self, series, attr, config):
+        """Text: Length-based or keyword-based generalization."""
+        try:
+            # Level 1: Short/Medium/Long based on character count
+            mapping_1 = {}
+            for val in series.dropna().unique():
+                text_len = len(str(val))
+                if text_len < 20:
+                    mapping_1[val] = "Short"
+                elif text_len < 100:
+                    mapping_1[val] = "Medium"
+                else:
+                    mapping_1[val] = "Long"
+            
+            # Level 2: Just "Text"
+            mapping_2 = {val: "Text" for val in mapping_1}
+            
+            self.hierarchies[attr] = {
+                'type': 'text',
+                'mapping': {1: mapping_1, 2: mapping_2},
+                'max_level': 3,
+            }
+            self.max_levels[attr] = 3
+        except Exception as e:
+            print(f"  Warning: Failed to build text hierarchy for '{attr}': {e}")
+            # Fallback to nominal
+            self._build_nominal_hierarchy(series, attr, config)
 
     # ------------------------------------------------------------------ #
     # Generalize

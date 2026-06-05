@@ -10,7 +10,7 @@ to compute correlation weights between QI attributes and the sensitive attribute
 
 import numpy as np
 import pandas as pd
-from sklearn.feature_selection import mutual_info_classif
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 
 
 # Random Index (RI) values for AHP consistency check (n=1..10)
@@ -59,24 +59,70 @@ class AttributeCorrelationEvaluation:
 
         # Step 1: Compute NMI
         n_samples = len(df)
-        n_classes = df[sensitive_attribute].nunique()
+        
+        # Detect if sensitive attribute is continuous or discrete
+        sensitive_values = df[sensitive_attribute].dropna()
+        n_unique = sensitive_values.nunique()
+        is_continuous = (
+            pd.api.types.is_float_dtype(sensitive_values) and 
+            n_unique > 20
+        ) or (
+            pd.api.types.is_numeric_dtype(sensitive_values) and 
+            n_unique > len(df) * 0.5
+        )
+        
+        if is_continuous:
+            # For continuous sensitive attribute, use mutual_info_regression
+            print(f"  Sensitive attribute '{sensitive_attribute}' detected as continuous (unique values: {n_unique})")
+            print(f"  Using mutual_info_regression for NMI computation")
+            use_regression = True
+            
+            # For regression, sensitive attribute should be numeric
+            y_data = pd.to_numeric(sensitive_values, errors='coerce').fillna(sensitive_values.mean()).values
+        else:
+            # For discrete sensitive attribute, use mutual_info_classif
+            print(f"  Sensitive attribute '{sensitive_attribute}' detected as discrete (unique values: {n_unique})")
+            print(f"  Using mutual_info_classif for NMI computation")
+            use_regression = False
+            
+            # For classification, convert to categorical codes
+            if pd.api.types.is_numeric_dtype(sensitive_values):
+                y_data = sensitive_values.values
+            else:
+                y_data = sensitive_values.astype('category').cat.codes.values
 
         nmi_scores = {}
         for attr in qi_attributes:
             if df[attr].dtype == 'object' or df[attr].dtype.name == 'category':
-                le_data = df[attr].astype('category').cat.codes
+                le_data = df[attr].astype('category').cat.codes.values  # Convert to numpy array
             else:
                 le_data = df[attr].values
 
-            mi = mutual_info_classif(
-                le_data.reshape(-1, 1),
-                df[sensitive_attribute].values,
-                discrete_features=True,
-                random_state=42
-            )[0]
+            # Ensure it's numpy array and reshape
+            le_data = np.array(le_data).reshape(-1, 1)
+            
+            # Align with sensitive attribute (drop NaN indices)
+            valid_indices = sensitive_values.index
+            le_data_aligned = le_data[df.index.isin(valid_indices)]
+            
+            if use_regression:
+                # Use mutual_info_regression for continuous target
+                mi = mutual_info_regression(
+                    le_data_aligned,
+                    y_data,
+                    random_state=42
+                )[0]
+            else:
+                # Use mutual_info_classif for discrete target
+                mi = mutual_info_classif(
+                    le_data_aligned,
+                    y_data,
+                    discrete_features=True,
+                    random_state=42
+                )[0]
 
             # Normalize by entropy of sensitive attribute for NMI
-            sens_entropy = self._entropy(df[sensitive_attribute].values)
+            sens_entropy = self._entropy(y_data)
             nmi = mi / sens_entropy if sens_entropy > 0 else 0.0
             nmi_scores[attr] = max(0.0, nmi)
 
@@ -170,7 +216,19 @@ class AttributeCorrelationEvaluation:
             return 3
 
     def _entropy(self, labels):
-        """Compute entropy of a label array."""
-        _, counts = np.unique(labels, return_counts=True)
-        probs = counts / counts.sum()
+        """Compute entropy of a label array (handles both discrete and continuous)."""
+        if len(labels) == 0:
+            return 0.0
+        
+        # For continuous data, use histogram-based entropy estimation
+        if pd.api.types.is_float_dtype(labels) and len(np.unique(labels)) > 20:
+            # Bin the data for entropy estimation
+            counts, _ = np.histogram(labels, bins=min(50, len(labels) // 10))
+            counts = counts[counts > 0]  # Remove zero bins
+            probs = counts / counts.sum()
+        else:
+            # For discrete data, use standard entropy
+            _, counts = np.unique(labels, return_counts=True)
+            probs = counts / counts.sum()
+        
         return -np.sum(probs * np.log2(probs + 1e-10))
