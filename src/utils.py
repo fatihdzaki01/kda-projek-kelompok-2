@@ -1,40 +1,87 @@
 """
-Utility functions for data loading and preprocessing.
+Utility functions: data type detection, config validation, preprocessing.
 """
 
 import pandas as pd
+import numpy as np
 
-from src.config import RAW_DATA_PATH, OUTLIER_FEATURES
 
-
-def load_and_preprocess_data(filepath=None):
+def detect_column_type(series):
     """
-    Load dataset and apply preprocessing (BMI outlier clipping).
-
-    Args:
-        filepath: Path to CSV file. Defaults to RAW_DATA_PATH.
+    Auto-detect column type for generalization hierarchy.
 
     Returns:
-        pd.DataFrame: Cleaned dataframe ready for privacy pipeline.
+        str: 'numerical_continuous', 'numerical_ordinal',
+             'categorical_binary', 'categorical_nominal'
     """
-    if filepath is None:
-        filepath = RAW_DATA_PATH
+    n_unique = series.nunique()
+    dtype = series.dtype
 
-    df = pd.read_csv(filepath)
+    if n_unique == 2:
+        return 'categorical_binary'
+    elif dtype == 'object' or dtype.name == 'category':
+        return 'categorical_nominal'
+    elif dtype in ['float32', 'float64']:
+        return 'numerical_continuous'
+    elif dtype in ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64']:
+        if n_unique <= 20:
+            return 'numerical_ordinal'
+        else:
+            return 'numerical_continuous'
+    else:
+        return 'categorical_nominal'
 
-    # Outlier clipping (same as notebook)
-    df_clean = df.copy()
-    for col in OUTLIER_FEATURES:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
 
-        lower = Q1 - 1.5 * IQR
-        upper = Q3 + 1.5 * IQR
+def validate_config(df, config):
+    """
+    Validate dataset configuration before pipeline runs.
 
-        df_clean[col] = df_clean[col].clip(lower=lower, upper=upper)
-        print(f' {col}: clipping ke [{lower:.2f}, {upper:.2f}]')
+    Returns:
+        tuple: (errors: list, warnings: list)
+    """
+    errors = []
+    warnings = []
 
-    print(f'\nShape setelah capping: {df_clean.shape}')
+    all_cols = df.columns.tolist()
 
-    return df_clean
+    qi_attrs = config.get('qi_attributes', [])
+    sens_attr = config.get('sensitive_attribute', '')
+    id_attrs = config.get('identifier_attributes', [])
+    non_sens = config.get('non_sensitive_attributes', [])
+
+    all_configured = qi_attrs + [sens_attr] + id_attrs + non_sens
+    if sens_attr:
+        all_configured = qi_attrs + [sens_attr] + id_attrs + non_sens
+    else:
+        all_configured = qi_attrs + id_attrs + non_sens
+
+    for attr in all_configured:
+        if attr and attr not in all_cols:
+            errors.append(f"Attribute '{attr}' not found in dataset columns: {all_cols[:10]}...")
+
+    if not sens_attr:
+        errors.append("Sensitive attribute must be specified")
+    elif sens_attr in qi_attrs:
+        errors.append(f"Sensitive attribute '{sens_attr}' cannot also be a QI attribute")
+
+    qi_set = set(qi_attrs)
+    id_set = set(id_attrs)
+
+    overlap = qi_set & id_set
+    if overlap:
+        errors.append(f"Overlap between QI and Identifier: {overlap}")
+
+    overlap_ns = qi_set & set(non_sens)
+    if overlap_ns:
+        errors.append(f"Overlap between QI and Non-sensitive: {overlap_ns}")
+
+    if sens_attr in id_set:
+        errors.append(f"Sensitive attribute '{sens_attr}' cannot be an Identifier")
+
+    if not qi_attrs:
+        errors.append("At least one QI attribute must be specified")
+
+    if len(df) < 100:
+        warnings.append(f"Dataset has only {len(df)} records. Minimum recommended: 100")
+
+    return errors, warnings

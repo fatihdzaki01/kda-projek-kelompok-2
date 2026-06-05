@@ -1,18 +1,16 @@
 """
-ACE (Anonymity-Conscious Extension).
+K-Anonymity Enforcer (formerly ACE).
 
-Safety net after ACDP Tree to enforce k-anonymity.
+Safety net after ACDP Tree to enforce k-anonymity by iteratively
+increasing generalization levels for violation groups.
 """
 
 import pandas as pd
 
-from src.config import K_ANONYMITY, QI_ATTRIBUTES
-from src.hierarchy import HIERARCHY
 
-
-class ACE:
+class KAnonymityEnforcer:
     """
-    Anonymity-Conscious Extension (ACE)
+    Enforce k-anonymity on ACDP Tree output.
 
     Fungsi:
     - Safety net setelah ACDP Tree
@@ -21,16 +19,17 @@ class ACE:
     - Selalu generalize dari ORIGINAL values
     """
 
-    def __init__(self, k=K_ANONYMITY, hierarchy=None, max_iterations=20):
+    def __init__(self, k=5, hierarchy=None, qi_attributes=None, max_iterations=20):
         self.k = k
-        self.hierarchy = hierarchy if hierarchy else HIERARCHY
+        self.hierarchy = hierarchy
+        self.qi_attributes = qi_attributes or []
         self.max_iterations = max_iterations
         self.current_levels = {}
         self.iteration_log = []
 
     def _find_violations(self, df):
         """Cari equivalence class yang violate k-anonymity."""
-        groups = df.groupby(QI_ATTRIBUTES).size()
+        groups = df.groupby(self.qi_attributes).size()
         violations = groups[groups < self.k]
         return violations
 
@@ -43,7 +42,7 @@ class ACE:
                 group_key = (group_key,)
 
             mask = pd.Series([True] * len(df), index=df.index)
-            for attr, val in zip(QI_ATTRIBUTES, group_key):
+            for attr, val in zip(self.qi_attributes, group_key):
                 mask = mask & (df[attr].astype(str) == str(val))
 
             violation_indices.extend(df[mask].index.tolist())
@@ -62,7 +61,7 @@ class ACE:
         best_attr = None
         best_variance = -1
 
-        for attr in QI_ATTRIBUTES:
+        for attr in self.qi_attributes:
             can_generalize = any(
                 self.current_levels.get(idx, {}).get(attr, 0)
                 < self.hierarchy.get_max_level(attr)
@@ -87,7 +86,6 @@ class ACE:
         """
         df_result = df_current.copy()
 
-        # Pastikan kolom bisa menerima string values
         if df_result[attribute].dtype != object:
             df_result[attribute] = df_result[attribute].astype(object)
 
@@ -114,7 +112,7 @@ class ACE:
     def enforce_k_anonymity(self, df_original, df_tree_output,
                             tree_record_levels, verbose=True):
         """
-        Main ACE: enforce k-anonymity pada output ACDP Tree.
+        Main enforcement: enforce k-anonymity pada output ACDP Tree.
 
         Args:
             df_original       : DataFrame original
@@ -132,7 +130,7 @@ class ACE:
 
         if verbose:
             print('=' * 80)
-            print(f'ACE: Enforcing {self.k}-Anonymity')
+            print(f'K-ANONYMITY ENFORCER: Enforcing {self.k}-Anonymity')
             print('=' * 80)
 
         for iteration in range(self.max_iterations):
@@ -147,7 +145,7 @@ class ACE:
 
             if n_violations == 0:
                 if verbose:
-                    print(f'\n[OK] k-anonymity satisfied after {iteration} iterations!')
+                    print(f'\nk-anonymity satisfied after {iteration} iterations!')
                 break
 
             violation_indices = self._get_violation_indices(df_current, violations)
@@ -161,7 +159,7 @@ class ACE:
 
             if attr_to_gen is None:
                 if verbose:
-                    print('\n[WARNING] Semua attribute sudah max level.')
+                    print('\nSemua attribute sudah max level.')
                     print(f'   Remaining violations: {n_violations} groups')
                 break
 
@@ -180,6 +178,33 @@ class ACE:
                 'violation_records': n_records_vio,
             })
 
+        # Fallback: if violations remain after all iterations,
+        # force remaining violation records to max level for ALL attributes
+        if n_violations > 0:
+            if verbose:
+                print(f'\nFallback: forcing remaining {n_records_vio} records to max level')
+
+            for attr in self.qi_attributes:
+                max_lvl = self.hierarchy.get_max_level(attr)
+                for idx in violation_indices:
+                    current_level = self.current_levels.get(idx, {}).get(attr, 0)
+                    if current_level < max_lvl:
+                        if idx not in self.current_levels:
+                            self.current_levels[idx] = {}
+                        self.current_levels[idx][attr] = max_lvl
+                        original_val = df_original.loc[idx, attr]
+                        df_current.at[idx, attr] = self.hierarchy.generalize(
+                            attr, original_val, max_lvl
+                        )
+
+            # Re-check
+            final_violations = self._find_violations(df_current)
+            if verbose:
+                n_final = len(final_violations)
+                print(f'  Remaining violations after fallback: {n_final} groups')
+                if n_final == 0:
+                    print('  k-anonymity satisfied!')
+
         if verbose:
             print('=' * 80)
 
@@ -187,7 +212,7 @@ class ACE:
 
     def check_k_anonymity(self, df, verbose=True):
         """Cek apakah dataset memenuhi k-anonymity."""
-        groups = df.groupby(QI_ATTRIBUTES).size()
+        groups = df.groupby(self.qi_attributes).size()
 
         result = {
             'satisfies': bool((groups >= self.k).all()),

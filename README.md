@@ -1,109 +1,155 @@
-# kda-projek-kelompok-2
-projek mata kuliah keamanan data dan aplikasinya
+# ACDP Tree — Privacy-Preserving Data Anonymization
 
-anggota : 
-1. Najma Syakira (L0224023)
-2. Yoeke Sekti Pertiwi (L0224027)
-3. Fatih Dzaki Nabhani (L0224042)
-4. Muhammad Darell Hylmi (L0224045)
+Implementasi **ACDP-Tree (Attribute Correlation Differential Privacy Tree)** berdasarkan penelitian:
 
-## 📋 Deskripsi Proyek
+> **"Differential Privacy Medical Data Publishing Method Based on Attribute Correlation"**
+> Zhang & Li, Scientific Reports, Nature, 2022.
 
-Implementasi **ACDP Tree (Anonymity-Conscious Decision Tree)** untuk anonymisasi data kesehatan diabetes dengan privacy guarantees:
-- **K-Anonymity**: Setiap individu tidak dapat dibedakan dari minimal k-1 individu lain
-- **Differential Privacy**: Penambahan noise Laplace untuk melindungi informasi individu
+## Anggota Kelompok
 
-## 🗂️ Struktur Proyek
+| Nama | NIM |
+|---|---|
+| Najma Syakira | L0224023 |
+| Yoeke Sekti Pertiwi | L0224027 |
+| Fatih Dzaki Nabhani | L0224042 |
+| Muhammad Darell Hylmi | L0224045 |
+
+## Pipeline
 
 ```
-kda-projek-kelompok-2/
-├── data/
-│   └── raw/
-│       └── diabetes__health_indicators.csv    # Dataset original
-├── src/
-│   ├── acdp_tree.py          # ACDP Tree algorithm
-│   ├── ace.py                # ACE (k-anonymity enforcement)
-│   ├── config.py             # Konfigurasi parameter
-│   ├── hierarchy.py          # Generalization hierarchy
-│   ├── metrics.py            # Evaluation metrics
-│   ├── noise.py              # Differential privacy
-│   ├── utils.py              # Utility functions
-│   └── visualization.py      # Plotting functions
-├── frontend/
-│   ├── dashboard.py          # Streamlit dashboard
-│   └── README.md             # Dokumentasi frontend
-├── results/
-│   └── anonymized_data/      # Output hasil anonymisasi
-├── main.py                   # Pipeline utama
-├── requirements.txt          # Dependencies
-└── README.md                 # Dokumentasi ini
+Load CSV → Preprocess → ACE (AHP Ranking) → ACDP Tree (Exp. Mech. + Budget)
+→ KAnonymityEnforcer → Laplace Noise → Evaluate → Save
 ```
 
-## 🚀 Cara Menjalankan
+## Cara Pakai
 
-### 1. Install Dependencies
+### Setup
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Jalankan Pipeline ACDP Tree
+### Run dengan dataset default
 
 ```bash
 python main.py
 ```
 
-**Output:**
-- `results/anonymized_data/diabetes_anonymized_k5_eps1.0.csv` - Dataset anonymized
-- `results/anonymized_data/diabetes_noisy_counts_k5_eps1.0.csv` - Counts dengan noise
-- `results/anonymized_data/anonymization_metadata.json` - Metadata proses
-- `results/anonymized_data/evaluation_metrics.json` - Metrics evaluasi
-- `results/anonymized_data/evaluation_report.txt` - Laporan lengkap
-
-### 3. Jalankan Dashboard (Opsional)
+### Run dengan config custom
 
 ```bash
-streamlit run frontend/dashboard.py
+python main.py --config path/to/config.py
 ```
 
-Dashboard akan terbuka di browser pada `http://localhost:8501`
+### Output folder custom
 
-## ⚙️ Konfigurasi Parameter
+```bash
+python main.py --output results/my_experiment/
+```
 
-Edit file `src/config.py` untuk mengubah parameter:
+### Run unit tests
+
+```bash
+python -m unittest tests.test_acdp_tree -v
+```
+
+## Struktur File
+
+```
+.
+├── main.py                         # Pipeline entry point
+├── src/
+│   ├── config.py                   # Dataset & privacy configuration
+│   ├── preprocessing.py            # Data cleaning (missing, duplicates, outliers)
+│   ├── utils.py                    # validate_config(), detect_column_type()
+│   ├── hierarchy.py                # GenericGeneralizationHierarchy (auto-build)
+│   ├── attribute_correlation.py    # ACE: AHP-based attribute ranking
+│   ├── acdp_tree.py                # ACDP Tree + Exponential Mechanism + budget
+│   ├── ace.py                      # KAnonymityEnforcer (k-anonymity safety net)
+│   ├── noise.py                    # Laplace noise + PrivacyBudgetTracker
+│   ├── metrics.py                  # Evaluation metrics (info loss, KL-div, risk)
+│   └── visualization.py            # Plotting functions (parameter-based)
+├── tests/
+│   └── test_acdp_tree.py           # 33 unit tests
+├── data/raw/                       # Input datasets
+├── results/                        # Output results (per-dataset folder)
+└── requirements.txt
+```
+
+## Konfigurasi
+
+Edit `src/config.py`:
 
 ```python
-# Privacy parameters
-K_ANONYMITY = 5      # Minimal group size
-EPSILON = 1.0        # Privacy budget (smaller = more privacy)
-MAX_LEVEL = 3        # Max generalization level
+DATASET_CONFIG = {
+    'file_path': 'data/raw/dataset.csv',
+    'identifier_attributes': ['Name', 'ID'],    # akan di-drop
+    'qi_attributes': ['Age', 'Sex', 'BMI'],      # akan digeneralisasi
+    'sensitive_attribute': 'Disease',             # target privacy
+    'non_sensitive_attributes': ['Smoker'],       # dibiarkan as-is
+}
+
+PRIVACY_CONFIG = {
+    'k_anonymity': 5,            # k-anonymity parameter
+    'epsilon': 1.0,               # total DP budget (split: ε/2 tree + ε/2 noise)
+    'max_level': 3,               # max generalization depth
+    'max_tree_depth': 4,          # max tree depth
+}
+
+HIERARCHY_CONFIG = {
+    'n_bins_level1': 4,           # bins for continuous at level 1
+    'n_bins_level2': 2,           # bins for continuous at level 2
+    'ordinal_group_size': 4,      # group size for ordinal attributes
+    'top_k_frequent': 10,         # top-k categories for nominal
+}
+
+CUSTOM_HIERARCHY = {
+    # Optional: override auto-detect hierarchy
+    # 'Age': {'type': 'numerical_ordinal', 'mapping': {...}, 'max_level': 3}
+}
 ```
 
-## 📊 Fitur Dashboard
+## Privacy Budget (ε)
 
-- **Overview**: Key metrics dan privacy status
-- **Data Comparison**: Perbandingan distribusi original vs anonymized
-- **Privacy Metrics**: Re-identification risk dan DP noise
-- **Utility Metrics**: Information loss dan distribution preservation
-- **Visualizations**: Grafik interaktif untuk semua metrics
+Total ε dibagi dua:
 
-## 📈 Pipeline ACDP Tree
+- **ε/2** → Tree construction (Exponential Mechanism, arithmetic progression per level)
+- **ε/2** → Laplace noise pada leaf node counts
 
-1. **Load & Preprocess Data** - Baca dan bersihkan data
-2. **Compute Weights** - Hitung inverse frequency weights
-3. **Build ACDP Tree** - Optimasi generalisasi dengan weighted MI
-4. **Run ACE** - Enforce k-anonymity
-5. **Add DP Noise** - Tambah Laplace noise
-6. **Save Results** - Simpan dataset dan metrics
-7. **Evaluate** - Hitung information loss, KL-divergence, dll
-8. **Generate Report** - Buat laporan evaluasi
+## Komponen Utama
 
-## 🔐 Privacy Guarantees
+### ACE (Attribute Correlation Evaluation)
+AHP-based pairwise comparison matrix dengan 3-level importance scale. Menghasilkan ranking QI attributes berdasarkan korelasi terhadap sensitive attribute.
 
-- ✅ **K-Anonymity (k=5)**: Setiap group minimal 5 records
-- ✅ **Differential Privacy (ε=1.0)**: Laplace noise pada counts
-- ✅ **Re-identification Risk**: Reduced dari ~X% ke ~Y%
+### ACDP Tree
+Generalization optimizer dengan per-record decision. Menggunakan:
+- **Weighted Mutual Information** sebagai split criteria
+- **Exponential Mechanism** untuk split point continuous attributes
+- **Arithmetic progression** budget allocation per tree level
 
-## 📝 Lisensi
+### KAnonymityEnforcer
+Safety net setelah tree: enforce k-anonymity dengan iterative generalization dari original values.
 
-Proyek ini dibuat untuk keperluan akademik - Mata Kuliah Keamanan Data dan Aplikasinya
+### Differential Privacy
+Laplace mechanism dengan sensitivity = 1 (count query).
+
+## Evaluasi Metrics
+
+- **Information Loss**: unique values lost + entropy reduction
+- **KL-Divergence**: distribution preservation
+- **Re-identification Risk**: unique individuals percentage
+- **Privacy-Utility Tradeoff**: privacy gain vs utility loss
+- **Sensitive Attribute TVD**: distribution change
+
+## Output
+
+Semua hasil disimpan di `results/{dataset_name}/`:
+
+```
+results/{dataset_name}/
+├── {dataset}_anonymized_k5_eps1.0.csv
+├── {dataset}_noisy_counts_k5_eps1.0.csv
+├── anonymization_metadata.json
+├── evaluation_metrics.json
+└── evaluation_report.txt
+```
