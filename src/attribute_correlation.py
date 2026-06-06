@@ -86,17 +86,11 @@ class AttributeCorrelationEvaluation:
             use_regression = False
             
             # For classification, convert to categorical codes
-            if pd.api.types.is_numeric_dtype(sensitive_values):
-                y_data = sensitive_values.values
-            else:
-                y_data = sensitive_values.astype('category').cat.codes.values
+            y_data = pd.factorize(sensitive_values)[0]
 
         nmi_scores = {}
         for attr in qi_attributes:
-            if df[attr].dtype == 'object' or df[attr].dtype.name == 'category':
-                le_data = df[attr].astype('category').cat.codes.values  # Convert to numpy array
-            else:
-                le_data = df[attr].values
+            le_data = pd.factorize(df[attr])[0]
 
             # Ensure it's numpy array and reshape
             le_data = np.array(le_data).reshape(-1, 1)
@@ -198,7 +192,7 @@ class AttributeCorrelationEvaluation:
             print(f'{rank:<5d} {attr:<20s} {weight:<10.4f} {nmi:<10.4f}')
         print('-' * 60)
         if self.consistency_ratio_ is not None:
-            cr_status = '✅' if self.consistency_ratio_ < 0.1 else '⚠️'
+            cr_status = '[OK]' if self.consistency_ratio_ < 0.1 else '[WARN]'
             print(f'Consistency Ratio (CR): {self.consistency_ratio_:.4f} {cr_status}')
         print('=' * 60)
 
