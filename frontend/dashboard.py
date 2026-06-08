@@ -930,13 +930,15 @@ def show_run_anonymization():
             
             info_loss_df = metrics['information_loss']
             info_loss_chart = pd.DataFrame(info_loss_df)
+            col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_chart.columns else 'Unique Lost (%)'
             
             fig_info_loss = go.Figure()
+            colors = [ACDP_COLORS[3] if v >= 0 else ACDP_COLORS[2] for v in info_loss_chart[col_name]]
             fig_info_loss.add_trace(go.Bar(
                 x=info_loss_chart['Attribute'],
-                y=info_loss_chart['Unique Lost (%)'],
-                name='Unique Values Lost (%)',
-                marker_color=ACDP_COLORS[3]
+                y=info_loss_chart[col_name],
+                name='Unique Change (%)',
+                marker_color=colors
             ))
             fig_info_loss.add_trace(go.Bar(
                 x=info_loss_chart['Attribute'],
@@ -1226,8 +1228,13 @@ def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, t
     """Overview page with key metrics"""
     st.markdown("### Overview")
     
-    avg_info_loss = info_loss['Unique Lost (%)'].mean() if info_loss is not None else 0
+    col_name = 'Unique Change (%)' if info_loss is not None and 'Unique Change (%)' in info_loss.columns else 'Unique Lost (%)'
+    raw_info_loss = info_loss[col_name].mean() if info_loss is not None else 0
+    avg_info_loss = max(0, raw_info_loss)
     risk_reduction = orig_risk['unique_risk_pct'] - anon_risk['unique_risk_pct'] if orig_risk and anon_risk else 0
+    
+    raw_utility = tradeoff['utility_score']
+    utility_score = max(0, min(100, raw_utility))
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -1235,7 +1242,7 @@ def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, t
         st.metric("Privacy Gain", f"{tradeoff['privacy_gain_pct']:.1f}%")
     
     with col2:
-        st.metric("Utility Score", f"{tradeoff['utility_score']:.1f}/100")
+        st.metric("Utility Score", f"{utility_score:.1f}/100")
     
     with col3:
         st.metric("Information Loss", f"{avg_info_loss:.1f}%")
@@ -1289,8 +1296,8 @@ def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, t
             f"{orig_risk['unique_risk_pct']:.2f}%",
             f"{anon_risk['unique_risk_pct']:.2f}%",
             f"{tradeoff['privacy_gain_pct']:.2f}%",
-            f"{tradeoff['utility_score']:.2f}/100",
-            f"{info_loss['Unique Lost (%)'].mean():.2f}%"
+            f"{utility_score:.2f}/100",
+            f"{avg_info_loss:.2f}%"
         ]
     }
     
@@ -1448,13 +1455,16 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
     col1, col2 = st.columns(2)
     
     with col1:
-        fig = px.bar(
-            info_loss,
-            x='Attribute',
-            y='Unique Lost (%)',
-            color_discrete_sequence=[ACDP_COLORS[3]],
-        )
-        fig.update_layout(height=400)
+        fig = go.Figure()
+        col_name = 'Unique Change (%)' if info_loss is not None and 'Unique Change (%)' in info_loss.columns else 'Unique Lost (%)'
+        if info_loss is not None:
+            colors = [ACDP_COLORS[3] if v >= 0 else ACDP_COLORS[2] for v in info_loss[col_name]]
+            fig.add_trace(go.Bar(
+                x=info_loss['Attribute'],
+                y=info_loss[col_name],
+                marker_color=colors,
+            ))
+        fig.update_layout(height=400, yaxis_title='Unique Change (%)')
         st.plotly_chart(fig, use_container_width=True)
     
     with col2:
@@ -1505,11 +1515,13 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
         st.metric("Privacy Gain", f"{tradeoff['privacy_gain_pct']:.2f}%")
     
     with col2:
-        st.metric("Utility Loss", f"{tradeoff['utility_loss_pct']:.2f}%")
+        utility_loss = max(0, tradeoff['utility_loss_pct'])
+        st.metric("Utility Loss", f"{utility_loss:.2f}%")
     
     with col3:
-        st.metric("Privacy/Utility Ratio", f"{tradeoff['privacy_utility_ratio']:.2f}",
-                 delta="Good" if tradeoff['privacy_utility_ratio'] > 1.0 else "Fair")
+        pu_ratio = tradeoff['privacy_utility_ratio'] if tradeoff['utility_loss_pct'] > 0 else 0
+        st.metric("Privacy/Utility Ratio", f"{pu_ratio:.2f}",
+                 delta="Good" if pu_ratio > 1.0 else "Fair")
     
     # Tradeoff scatter plot
     fig = go.Figure()
@@ -1518,7 +1530,7 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
                  fillcolor=ACDP_COLORS[0], opacity=0.1, line_width=0)
     
     fig.add_trace(go.Scatter(
-        x=[tradeoff['utility_loss_pct']],
+        x=[utility_loss],
         y=[tradeoff['privacy_gain_pct']],
         mode='markers+text',
         marker=dict(size=20, color=ACDP_COLORS[1]),
@@ -2239,10 +2251,6 @@ def create_comparison_chart(rows, metric, title):
     return fig
 
 
-if __name__ == "__main__":
-    main()
-
-
 def create_treemap_visualization(tree_structure):
     """Create Treemap visualization (alternative to Sankey)"""
     import plotly.graph_objects as go
@@ -2286,16 +2294,24 @@ def create_treemap_visualization(tree_structure):
         labels=labels,
         parents=parents,
         values=values,
-        marker=dict(colors=['#2ea043' if p == "" else '#58a6ff' for p in parents], line=dict(width=2, color='#30363d')),
+        branchvalues="total",
+        marker=dict(line=dict(width=2, color='#30363d')),
         hovertext=hover_texts,
         hoverinfo="text",
-        textfont=dict(size=12, color='#e6edf3')
+        textfont=dict(size=12),
+        texttemplate="%{label}<br>%{value} records"
     ))
     
     fig.update_layout(
         title="ACDP Tree Structure (Treemap)",
         height=700,
-        margin=dict(t=50, l=10, r=10, b=10)
+        margin=dict(t=50, l=10, r=10, b=10),
+        template='plotly_dark',
+        treemapcolorway=['#2ea043', '#58a6ff', '#f59e0b', '#ef4444', '#8b5cf6', '#1f77b4'],
     )
     
     return fig
+
+
+if __name__ == "__main__":
+    main()
