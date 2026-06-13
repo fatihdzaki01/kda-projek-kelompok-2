@@ -379,7 +379,8 @@ def run_pipeline(config=None, privacy_config=None, hierarchy_config=None,
     print('=' * 80)
 
     # Compute utility metrics (cap utility loss at 100)
-    avg_info_loss = info_loss_df['Unique Lost (%)'].mean()
+    col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_df.columns else 'Unique Lost (%)'
+    avg_info_loss = info_loss_df[col_name].mean()
     utility_loss_capped = min(max(avg_info_loss, 0), 100)
     utility_score_capped = max(0, min(100, 100 - utility_loss_capped))
 
@@ -456,7 +457,7 @@ Re-identification Risk:
 {info_loss_df.to_string(index=False)}
 
 Summary:
-  - Average unique values lost: {info_loss_df['Unique Lost (%)'].mean():.2f}%
+   - Average unique values change: {avg_info_loss:.2f}%
   - Average entropy reduction : {info_loss_df['Entropy Reduction (%)'].mean():.2f}%
 
 ===============================================================================
