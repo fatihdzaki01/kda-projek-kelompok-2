@@ -234,7 +234,9 @@ def calculate_privacy_utility_tradeoff(
     avg_kl_div = dist_preserve_df['KL-Divergence'].mean()
 
     # Combined utility score (0-100, higher = better)
+    # Cap between 0 and 100 to handle edge cases
     utility_score = 100 - avg_info_loss
+    utility_score = max(0, min(100, utility_score))  # Clamp to [0, 100]
 
     # Privacy-Utility Ratio
     pu_ratio = privacy_gain / (avg_info_loss + 1e-10)
