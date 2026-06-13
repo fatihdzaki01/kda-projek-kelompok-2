@@ -1,0 +1,134 @@
+
+================================================================================
+PRIVACY-PRESERVING DATA ANONYMIZATION - EVALUATION REPORT
+================================================================================
+
+Dataset: Diabetes Health Indicators (BRFSS 2015)
+Date: 2026-06-01 19:53:55
+Records: 253,680 (original) → 253,680 (anonymized)
+
+================================================================================
+1. PRIVACY GUARANTEES
+================================================================================
+
+k-Anonymity:
+  - Parameter k              : 5
+  - Satisfied                : True ✅
+  - Min group size           : 5
+  - Max group size           : 5,136
+  - Avg group size           : 86.58
+  - Total equivalence classes: 2,930
+
+Differential Privacy:
+  - Epsilon (ε)              : 1.0
+  - Mechanism                : Laplace Noise
+  - Applied to               : Aggregated counts
+  - Mean noise added         : 0.0435
+
+Re-identification Risk:
+  - Before: 42.16% unique individuals
+  - After : 0.00% unique individuals
+  - Risk reduction: 42.16 percentage points
+
+================================================================================
+2. INFORMATION LOSS
+================================================================================
+
+Attribute  Original Unique  Anonymized Unique  Unique Lost (%)  Entropy Reduction (%)
+      Age               13                  6            53.85                  46.56
+      Sex                2                  2             0.00                   0.00
+Education                6                  9           -50.00                  -0.13
+   Income                8                 13           -62.50                  -0.62
+      BMI               30                  7            76.67                  61.34
+  GenHlth                5                  4            20.00                  30.53
+
+Summary:
+  - Average unique values lost: 6.34%
+  - Average entropy reduction : 22.95%
+
+================================================================================
+3. DISTRIBUTION PRESERVATION
+================================================================================
+
+Attribute  KL-Divergence    TVD Preservation Quality
+      Age        20.5675 1.0000                 Poor
+      Sex         0.0000 0.0000                 Good
+Education         0.0002 0.0002                 Good
+   Income         0.0018 0.0018                 Good
+      BMI        19.9963 1.0000                 Poor
+  GenHlth        21.5856 1.0000                 Poor
+
+Summary:
+  - Average KL-Divergence: 10.3586
+  - Average TVD          : 0.5003
+  - Attributes with "Good" quality: 3 / 6
+
+================================================================================
+4. PRIVACY-UTILITY TRADE-OFF
+================================================================================
+
+Privacy Metrics:
+  - Privacy Gain             : 100.00%
+
+Utility Metrics:
+  - Utility Loss             : 6.34%
+  - Utility Score            : 93.66/100
+
+Trade-off:
+  - Privacy/Utility Ratio    : 15.78
+  - Assessment               : Good
+
+================================================================================
+5. ANONYMIZATION PIPELINE SUMMARY
+================================================================================
+
+Step 1: ACDP Tree (Generalization Optimizer)
+  - Tree depth               : 3
+  - Split criteria           : Weighted Mutual Information
+  - Violations before ACE    : 924 groups
+  - Groups after tree        : 3,539
+
+Step 2: ACE (k-anonymity Enforcement)
+  - Iterations               : 12
+  - Records overridden       : 1,928 (0.76%)
+  - Final violations         : 0 groups ✅
+
+Step 3: Differential Privacy (Laplace Noise)
+  - Epsilon consumed         : 1.0 (100%)
+  - Mean percent error       : 23.22%
+
+================================================================================
+6. SENSITIVE ATTRIBUTE PRESERVATION
+================================================================================
+
+Diabetes Distribution:
+  Class 0 (No Diabetes)  : Original 84.24% → Anonymized 84.24%
+  Class 1 (Prediabetes)  : Original 1.83% → Anonymized 1.83%
+  Class 2 (Diabetes)     : Original 13.93% → Anonymized 13.93%
+
+Total Variation Distance: 0.0000
+Status: Well preserved
+
+================================================================================
+7. CONCLUSION
+================================================================================
+
+Privacy Status:
+  ✅ k-anonymity (k=5) satisfied
+  ✅ Differential Privacy (ε=1.0) applied
+  ✅ Re-identification risk significantly reduced
+
+Utility Status:
+  ✅ Utility score: 93.66/100
+  ✅ Average information loss: 6.34%
+  ⚠️ Distribution preservation: 10.3586
+
+Overall Assessment:
+  The anonymized dataset achieves 5-anonymity with ε=1.0 differential
+  privacy while maintaining 93.66% utility. The dataset is
+  ready for publishing and can be used for research, analysis, and ML training
+  with strong privacy guarantees.
+
+================================================================================
+End of Report
+================================================================================
