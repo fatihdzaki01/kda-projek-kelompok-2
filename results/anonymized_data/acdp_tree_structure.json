@@ -1,0 +1,1007 @@
+{
+  "metadata": {
+    "k_anonymity": 5,
+    "max_depth": 3,
+    "qi_attributes": [
+      "Age",
+      "Sex",
+      "Education",
+      "Income",
+      "BMI",
+      "GenHlth"
+    ],
+    "sensitive_attribute": "Diabetes_012",
+    "total_records": 253680
+  },
+  "tree": {
+    "depth": 0,
+    "is_leaf": false,
+    "record_count": 253680,
+    "attribute": "GenHlth",
+    "generalization_level": 1,
+    "final_levels": null,
+    "children": [
+      {
+        "depth": 1,
+        "is_leaf": false,
+        "record_count": 43651,
+        "attribute": "BMI",
+        "generalization_level": 1,
+        "final_levels": null,
+        "children": [
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 21275,
+            "attribute": "Age",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 9596,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "MiddleAge"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 6107,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Adult"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 4569,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Senior"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 1003,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Young"
+              }
+            ],
+            "parent_value": "Obese"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 13142,
+            "attribute": "Age",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 5350,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "MiddleAge"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 4494,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Senior"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 2819,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Adult"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 479,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Young"
+              }
+            ],
+            "parent_value": "Overweight"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 8421,
+            "attribute": "Age",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 3142,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "MiddleAge"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 1643,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Adult"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 3182,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Senior"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 454,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Young"
+              }
+            ],
+            "parent_value": "Normal"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 813,
+            "attribute": "Age",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 154,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Adult"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 343,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "MiddleAge"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 280,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Senior"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 36,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Young"
+              }
+            ],
+            "parent_value": "Underweight"
+          }
+        ],
+        "parent_value": "Poor"
+      },
+      {
+        "depth": 1,
+        "is_leaf": false,
+        "record_count": 75646,
+        "attribute": "Age",
+        "generalization_level": 1,
+        "final_levels": null,
+        "children": [
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 21578,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 7007,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 3646,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 10756,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 169,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Adult"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 28545,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 13262,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 5000,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 10030,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 253,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "MiddleAge"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 19037,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 7673,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 5042,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 6052,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 270,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Senior"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 6486,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 1709,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 1951,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 2718,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 108,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Young"
+          }
+        ],
+        "parent_value": "Fair"
+      },
+      {
+        "depth": 1,
+        "is_leaf": false,
+        "record_count": 134383,
+        "attribute": "Age",
+        "generalization_level": 1,
+        "final_levels": null,
+        "children": [
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 25314,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 10873,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 8690,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 5407,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 344,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Senior"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 49294,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 20531,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 15157,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 13162,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 444,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "MiddleAge"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 43812,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 11757,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 14526,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 17112,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 417,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Adult"
+          },
+          {
+            "depth": 2,
+            "is_leaf": false,
+            "record_count": 15963,
+            "attribute": "BMI",
+            "generalization_level": 1,
+            "final_levels": null,
+            "children": [
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 6762,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Normal"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 5430,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Overweight"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 3462,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Obese"
+              },
+              {
+                "depth": 3,
+                "is_leaf": true,
+                "record_count": 309,
+                "attribute": null,
+                "generalization_level": null,
+                "final_levels": {
+                  "Age": 1,
+                  "Sex": 0,
+                  "Education": 0,
+                  "Income": 0,
+                  "BMI": 1,
+                  "GenHlth": 1
+                },
+                "children": [],
+                "parent_value": "Underweight"
+              }
+            ],
+            "parent_value": "Young"
+          }
+        ],
+        "parent_value": "Good"
+      }
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "information_loss": [
+    {
+      "Attribute": "Age",
+      "Original Unique": 13,
+      "Anonymized Unique": 6,
+      "Unique Lost (%)": 53.85,
+      "Entropy Reduction (%)": 46.56
+    },
+    {
+      "Attribute": "Sex",
+      "Original Unique": 2,
+      "Anonymized Unique": 2,
+      "Unique Lost (%)": 0.0,
+      "Entropy Reduction (%)": 0.0
+    },
+    {
+      "Attribute": "Education",
+      "Original Unique": 6,
+      "Anonymized Unique": 9,
+      "Unique Lost (%)": -50.0,
+      "Entropy Reduction (%)": -0.13
+    },
+    {
+      "Attribute": "Income",
+      "Original Unique": 8,
+      "Anonymized Unique": 13,
+      "Unique Lost (%)": -62.5,
+      "Entropy Reduction (%)": -0.62
+    },
+    {
+      "Attribute": "BMI",
+      "Original Unique": 30,
+      "Anonymized Unique": 7,
+      "Unique Lost (%)": 76.67,
+      "Entropy Reduction (%)": 61.34
+    },
+    {
+      "Attribute": "GenHlth",
+      "Original Unique": 5,
+      "Anonymized Unique": 4,
+      "Unique Lost (%)": 20.0,
+      "Entropy Reduction (%)": 30.53
+    }
+  ],
+  "distribution_preservation": [
+    {
+      "Attribute": "Age",
+      "KL-Divergence": 20.5675,
+      "TVD": 1.0,
+      "Preservation Quality": "Poor"
+    },
+    {
+      "Attribute": "Sex",
+      "KL-Divergence": 0.0,
+      "TVD": 0.0,
+      "Preservation Quality": "Good"
+    },
+    {
+      "Attribute": "Education",
+      "KL-Divergence": 0.0002,
+      "TVD": 0.0002,
+      "Preservation Quality": "Good"
+    },
+    {
+      "Attribute": "Income",
+      "KL-Divergence": 0.0018,
+      "TVD": 0.0018,
+      "Preservation Quality": "Good"
+    },
+    {
+      "Attribute": "BMI",
+      "KL-Divergence": 19.9963,
+      "TVD": 1.0,
+      "Preservation Quality": "Poor"
+    },
+    {
+      "Attribute": "GenHlth",
+      "KL-Divergence": 21.5856,
+      "TVD": 1.0,
+      "Preservation Quality": "Poor"
+    }
+  ],
+  "reidentification_risk": {
+    "original": {
+      "total_groups": 56284,
+      "unique_individuals": 23732,
+      "small_groups": 43383,
+      "unique_risk_pct": 42.16,
+      "small_group_risk_pct": 77.08,
+      "avg_group_size": 4.51,
+      "min_group_size": 1,
+      "max_group_size": 209
+    },
+    "anonymized": {
+      "total_groups": 2930,
+      "unique_individuals": 0,
+      "small_groups": 0,
+      "unique_risk_pct": 0.0,
+      "small_group_risk_pct": 0.0,
+      "avg_group_size": 86.58,
+      "min_group_size": 5,
+      "max_group_size": 5136
+    }
+  },
+  "privacy_utility_tradeoff": {
+    "privacy_gain_pct": 100.0,
+    "utility_loss_pct": 6.34,
+    "utility_score": 93.66,
+    "avg_kl_divergence": 10.3586,
+    "privacy_utility_ratio": 15.78
+  },
+  "sensitive_distribution": {
+    "original": {
+      "0.0": 84.24116997792494,
+      "1.0": 1.8255282245348472,
+      "2.0": 13.933301797540206
+    },
+    "anonymized": {
+      "0.0": 84.24116997792494,
+      "1.0": 1.8255282245348472,
+      "2.0": 13.933301797540206
+    },
+    "tvd": 0.0
+  },
+  "summary": {
+    "privacy_satisfied": true,
+    "k_anonymity": 5,
+    "epsilon": 1.0,
+    "min_group_size": 5,
+    "avg_information_loss": 6.34,
+    "avg_kl_divergence": 10.3586,
+    "privacy_gain": 100.0,
+    "utility_score": 93.66
+  }
+}
