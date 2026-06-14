@@ -1,26 +1,10 @@
-"""
-Differential Privacy: Laplace Noise and Privacy Budget Tracker.
-"""
-
 import numpy as np
 import pandas as pd
 from datetime import datetime
+from src.utils import ensure_list
 
 
 def add_laplace_noise(value, epsilon, sensitivity=1):
-    """
-    Tambah Laplace noise ke satu nilai.
-
-    Formula: noise ~ Laplace(0, sensitivity/epsilon)
-
-    Args:
-        value       : float → nilai asli
-        epsilon     : float → privacy budget (kecil = lebih noise)
-        sensitivity : float → max perubahan dari 1 record (default=1)
-
-    Returns:
-        float → nilai + noise
-    """
     if epsilon <= 0:
         raise ValueError('Epsilon harus > 0')
 
@@ -31,26 +15,15 @@ def add_laplace_noise(value, epsilon, sensitivity=1):
 
 
 def add_noise_to_counts(df, epsilon, qi_attributes, sensitive_attribute=None):
-    """
-    Tambah Laplace noise ke group counts.
+    sens_attrs = ensure_list(sensitive_attribute) if sensitive_attribute else []
 
-    Args:
-        df                 : pd.DataFrame → k-anonymous dataset
-        epsilon            : float → privacy budget
-        qi_attributes      : list → QI attributes
-        sensitive_attribute: str → optional, include distribusi sensitive attr
-
-    Returns:
-        pd.DataFrame → group counts dengan noisy_count
-    """
-    if sensitive_attribute:
-        groups = df.groupby(
-            qi_attributes + [sensitive_attribute]
-        ).size().reset_index(name='count')
+    if sens_attrs:
+        existing = [a for a in sens_attrs if a in df.columns]
+        group_by = qi_attributes + existing if existing else qi_attributes
     else:
-        groups = df.groupby(
-            qi_attributes
-        ).size().reset_index(name='count')
+        group_by = qi_attributes
+
+    groups = df.groupby(group_by).size().reset_index(name='count')
 
     groups['noisy_count'] = groups['count'].apply(
         lambda x: max(0, add_laplace_noise(x, epsilon))
@@ -62,10 +35,6 @@ def add_noise_to_counts(df, epsilon, qi_attributes, sensitive_attribute=None):
 
 
 class PrivacyBudgetTracker:
-    """
-    Track konsumsi epsilon (privacy budget).
-    Implementasi composition theorem DP.
-    """
 
     def __init__(self, total_epsilon):
         self.total_epsilon = total_epsilon
@@ -73,12 +42,6 @@ class PrivacyBudgetTracker:
         self.operations = []
 
     def consume(self, epsilon, operation_name):
-        """
-        Konsumsi privacy budget.
-
-        Raises:
-            ValueError jika budget habis
-        """
         if epsilon <= 0:
             raise ValueError('Epsilon harus > 0')
 

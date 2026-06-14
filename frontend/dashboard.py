@@ -462,11 +462,14 @@ pio.templates.default = "dark_acdp"
 ACDP_COLORS = ["#3b82f6", "#60a5fa", "#f59e0b", "#ef4444"]
 
 # Constants - Load from backend config
-from src.config import DATASET_CONFIG, PRIVACY_CONFIG
+from src.config import DATASET_CONFIG, PRIVACY_CONFIG, HIERARCHY_CONFIG
+
+from src.utils import ensure_list
 
 RAW_DATA_PATH = DATASET_CONFIG['file_path']
 QI_ATTRIBUTES = DATASET_CONFIG['qi_attributes']
-SENSITIVE_ATTRIBUTE = DATASET_CONFIG['sensitive_attribute']
+SENSITIVE_ATTRIBUTES = ensure_list(DATASET_CONFIG.get('sensitive_attribute', []))
+SENSITIVE_ATTRIBUTE = SENSITIVE_ATTRIBUTES[0] if SENSITIVE_ATTRIBUTES else ''
 K_ANONYMITY = PRIVACY_CONFIG['k_anonymity']
 EPSILON = PRIVACY_CONFIG['epsilon']
 MAX_LEVEL = PRIVACY_CONFIG['max_level']
@@ -560,7 +563,7 @@ def show_run_anonymization():
     
     # Show data preview
     with st.expander("Preview Data (first 10 rows)"):
-        st.dataframe(df.head(10), use_container_width=True)
+        st.dataframe(df.head(10), width='stretch')
     
     # Configuration
     st.markdown("---")
@@ -584,18 +587,21 @@ def show_run_anonymization():
             help="Attributes used for generalization (usually demographic attributes)"
         )
         
-        # Sensitive Attribute
-        sens_attr = st.selectbox(
-            "Sensitive Attribute",
-            options=[col for col in all_cols if col not in qi_attrs],
-            index=0 if SENSITIVE_ATTRIBUTE not in all_cols else [col for col in all_cols if col not in qi_attrs].index(SENSITIVE_ATTRIBUTE) if SENSITIVE_ATTRIBUTE in [col for col in all_cols if col not in qi_attrs] else 0,
-            help="The attribute to protect (e.g., disease, salary)"
+        # Sensitive Attributes
+        default_sens = [s for s in SENSITIVE_ATTRIBUTES if s in all_cols]
+        if not default_sens and all_cols:
+            default_sens = [all_cols[0]]
+        sens_attrs = st.multiselect(
+            "Sensitive Attribute(s)",
+            options=all_cols,
+            default=default_sens,
+            help="The attribute(s) to protect (e.g., disease, salary)"
         )
-        
+
         # Identifier Attributes (optional)
         id_attrs = st.multiselect(
             "Identifier Attributes (will be dropped)",
-            options=[col for col in all_cols if col not in qi_attrs and col != sens_attr],
+            options=all_cols,
             default=[],
             help="Attributes like ID, Name that directly identify individuals"
         )
@@ -642,12 +648,33 @@ def show_run_anonymization():
     # Validation
     st.markdown("---")
     
+    # Check for overlaps
+    overlap_sens_qi = set(qi_attrs) & set(sens_attrs)
+    overlap_id_qi = set(qi_attrs) & set(id_attrs)
+    overlap_id_sens = set(sens_attrs) & set(id_attrs)
+    
+    errors_found = False
     if len(qi_attrs) == 0:
         st.error("⚠️ Please select at least one QI attribute")
-        return
+        errors_found = True
     
-    if sens_attr is None:
-        st.error("⚠️ Please select a sensitive attribute")
+    if not sens_attrs:
+        st.error("⚠️ Please select at least one sensitive attribute")
+        errors_found = True
+    
+    if overlap_sens_qi:
+        st.error(f"⚠️ Sensitive attribute(s) cannot also be QI: {overlap_sens_qi}")
+        errors_found = True
+    
+    if overlap_id_qi:
+        st.error(f"⚠️ Identifier attribute(s) cannot also be QI: {overlap_id_qi}")
+        errors_found = True
+    
+    if overlap_id_sens:
+        st.error(f"⚠️ Identifier attribute(s) cannot also be Sensitive: {overlap_id_sens}")
+        errors_found = True
+    
+    if errors_found:
         return
     
     # Show configuration summary
@@ -657,7 +684,7 @@ def show_run_anonymization():
             "Records": f"{len(df):,}",
             "Columns": len(df.columns),
             "QI Attributes": ", ".join(qi_attrs),
-            "Sensitive Attribute": sens_attr,
+            "Sensitive Attribute": sens_attrs,
             "Identifier Attributes": ", ".join(id_attrs) if id_attrs else "None",
             "K-Anonymity": k_anon,
             "Epsilon": epsilon,
@@ -671,26 +698,24 @@ def show_run_anonymization():
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        run_button = st.button("Run Anonymization", use_container_width=True, type="primary")
+        run_button = st.button("Run Anonymization", width='stretch', type="primary")
     
     if run_button:
-        st.markdown("---")
-        st.markdown("### Running Anonymization Pipeline...")
-        
-        # Save uploaded file temporarily
         import tempfile
         import shutil
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        from datetime import datetime
         
         temp_dir = tempfile.mkdtemp()
         temp_csv = os.path.join(temp_dir, "temp_dataset.csv")
         df.to_csv(temp_csv, index=False)
         
-        # Create config
         custom_config = {
             'file_path': temp_csv,
             'identifier_attributes': id_attrs,
             'qi_attributes': qi_attrs,
-            'sensitive_attribute': sens_attr,
+            'sensitive_attribute': sens_attrs,
             'non_sensitive_attributes': [],
         }
         
@@ -701,25 +726,30 @@ def show_run_anonymization():
             'max_tree_depth': max_tree_depth,
         }
         
-        # Output directory
         output_name = os.path.splitext(dataset_source)[0].replace(' ', '_').lower()
         custom_output = os.path.join('results', output_name)
         
-        # Progress bar
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+        # Status container for live progress
+        status_container = st.container()
+        
+        with status_container:
+            status_placeholder = st.empty()
+            progress_bar = st.progress(0)
+            log_expander = st.expander("Pipeline Logs", expanded=True)
+            log_area = log_expander.empty()
+        
+        pipeline_log = []
+        
+        def log(msg, step=None, progress=None):
+            pipeline_log.append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+            log_area.code('\n'.join(pipeline_log), language='text')
+            if step:
+                status_placeholder.info(step)
+            if progress is not None:
+                progress_bar.progress(progress)
         
         try:
-            # Import backend
-            from main import run_pipeline
-            from src.config import HIERARCHY_CONFIG
-            
-            status_text.text("Step 1/7: Preprocessing data...")
-            progress_bar.progress(10)
-            
-            # Capture output
-            import io
-            from contextlib import redirect_stdout, redirect_stderr
+            from src.pipeline import run_pipeline
             
             output_buffer = io.StringIO()
             
@@ -729,310 +759,23 @@ def show_run_anonymization():
                     privacy_config=custom_privacy,
                     hierarchy_config=HIERARCHY_CONFIG,
                     custom_hierarchy={},
-                    output_dir=custom_output
+                    output_dir=custom_output,
+                    progress_callback=lambda msg, p: log(msg, step=msg, progress=p)
                 )
             
-            progress_bar.progress(100)
-            status_text.text("Anonymization complete!")
+            # Capture full logs
+            full_logs = output_buffer.getvalue()
             
-            # Show results
-            st.success("**Anonymization completed successfully!**")
-            
-            # Get result data
             metadata = results['metadata']
             df_original = results['df_original']
             df_anonymized = results['df_anonymized']
             metrics = results['metrics']
             
-            # Display summary metrics
-            st.markdown("---")
-            st.markdown("### Results Summary")
-            
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.metric("Original Records", f"{metadata['dataset_info']['original_records']:,}")
-            
-            with col2:
-                st.metric("K-Anonymity", "Satisfied" if metadata['privacy_guarantees']['k_anonymity_satisfied'] else "Not Satisfied")
-            
-            with col3:
-                utility = metrics['privacy_utility_tradeoff']['utility_score']
-                st.metric("Utility Score", f"{utility:.2f}/100")
-            
-            with col4:
-                st.metric("Unique Groups", f"{metadata['privacy_guarantees']['total_groups']:,}")
-            
-            with col5:
-                privacy_gain = metrics['privacy_utility_tradeoff']['privacy_gain_pct']
-                st.metric("Privacy Gain", f"{privacy_gain:.1f}%")
-            
-            # Privacy Guarantees
-            st.markdown("---")
-            st.markdown("### Privacy Guarantees")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.success(
-                    f"**K-Anonymity Satisfied (k={k_anon})**\n\n"
-                    f"- Min group size: {metadata['privacy_guarantees']['min_group_size']}\n"
-                    f"- Max group size: {metadata['privacy_guarantees']['max_group_size']:,}\n"
-                    f"- Avg group size: {metadata['privacy_guarantees']['avg_group_size']:.2f}\n"
-                    f"- Total equivalence classes: {metadata['privacy_guarantees']['total_groups']:,}"
-                )
-            
-            with col2:
-                st.success(
-                    f"**Differential Privacy (ε={epsilon})**\n\n"
-                    f"- Tree construction budget: ε={epsilon/2:.2f}\n"
-                    f"- Laplace noise budget: ε={epsilon/2:.2f}\n"
-                    f"- Mean noise: {metadata['pipeline_summary']['noise']['mean_noise']:.4f}\n"
-                    f"- Mean percent error: {metadata['pipeline_summary']['noise']['mean_percent_error']:.2f}%"
-                )
-            
-            # ACDP Tree Visualization
-            st.markdown("---")
-            st.markdown("### ACDP Tree Structure")
-            
-            # Load tree structure
-            tree_file = os.path.join(custom_output, 'acdp_tree_structure.json')
-            if os.path.exists(tree_file):
-                with open(tree_file, 'r') as f:
-                    tree_data = json.load(f)
-                
-                # Create tree visualization
-                import plotly.graph_objects as go
-                
-                def create_tree_nodes(node, parent_id="", x=0, y=0, level=0, width=1.0):
-                    """Recursively create tree nodes for visualization"""
-                    nodes = []
-                    edges = []
-                    
-                    if node is None:
-                        return nodes, edges
-                    
-                    node_id = f"{parent_id}_{level}_{x}"
-                    
-                    # Node info
-                    if node.get('is_leaf', False):
-                        node_label = f"LEAF<br>Records: {node.get('record_count', 0)}"
-                        node_color = ACDP_COLORS[0]
-                    else:
-                        attr = node.get('attribute', 'Unknown')
-                        gen_level = node.get('generalization_level', 0)
-                        node_label = f"{attr}<br>Level: {gen_level}<br>Records: {node.get('record_count', 0)}"
-                        node_color = ACDP_COLORS[1]
-                    
-                    nodes.append({
-                        'id': node_id,
-                        'label': node_label,
-                        'x': x,
-                        'y': -y,
-                        'color': node_color,
-                        'size': min(30 + node.get('record_count', 0) / 10000, 50)
-                    })
-                    
-                    # Process children
-                    children = node.get('children', [])
-                    if children:
-                        child_width = width / len(children)
-                        for i, child in enumerate(children):
-                            child_x = x - width/2 + child_width * (i + 0.5)
-                            child_y = y + 1
-                            
-                            child_nodes, child_edges = create_tree_nodes(
-                                child, node_id, child_x, child_y, level + 1, child_width
-                            )
-                            
-                            # Add edge
-                            child_id = f"{node_id}_{level+1}_{child_x}"
-                            edges.append({
-                                'from': node_id,
-                                'to': child_id,
-                                'parent_value': child.get('parent_value', '')
-                            })
-                            
-                            nodes.extend(child_nodes)
-                            edges.extend(child_edges)
-                    
-                    return nodes, edges
-                
-                # Create visualization
-                tree_root = tree_data.get('tree')
-                if tree_root:
-                    nodes, edges = create_tree_nodes(tree_root, "", 0, 0, 0, 2.0)
-                    
-                    # Create Plotly figure
-                    fig = go.Figure()
-                    
-                    # Add edges
-                    for edge in edges:
-                        from_node = next((n for n in nodes if n['id'] == edge['from']), None)
-                        to_node = next((n for n in nodes if n['id'] == edge['to']), None)
-                        
-                        if from_node and to_node:
-                            fig.add_trace(go.Scatter(
-                                x=[from_node['x'], to_node['x']],
-                                y=[from_node['y'], to_node['y']],
-                                mode='lines',
-                                line=dict(color='#30363d', width=2),
-                                hoverinfo='skip',
-                                showlegend=False
-                            ))
-                    
-                    # Add nodes
-                    node_x = [n['x'] for n in nodes]
-                    node_y = [n['y'] for n in nodes]
-                    node_text = [n['label'] for n in nodes]
-                    node_color = [n['color'] for n in nodes]
-                    node_size = [n['size'] for n in nodes]
-                    
-                    fig.add_trace(go.Scatter(
-                        x=node_x,
-                        y=node_y,
-                        mode='markers+text',
-                        marker=dict(
-                            size=node_size,
-                            color=node_color,
-                            line=dict(color='white', width=2)
-                        ),
-                        text=node_text,
-                        textposition="middle center",
-                        textfont=dict(size=10, color='white'),
-                        hoverinfo='text',
-                        showlegend=False
-                    ))
-                    
-                    fig.update_layout(
-                        title=f"ACDP Tree Structure (Depth: {tree_data['metadata']['max_depth']}, Total Records: {tree_data['metadata']['total_records']:,})",
-                        showlegend=False,
-                        hovermode='closest',
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                        height=600,
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)'
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    with st.expander("Tree Metadata"):
-                        st.json(tree_data['metadata'])
-                else:
-                    st.warning("⚠️ Tree structure is empty")
-            else:
-                st.warning("⚠️ ACDP Tree structure file not found")
-            
-            # Information Loss Visualization
-            st.markdown("---")
-            st.markdown("### Information Loss Analysis")
-            
-            info_loss_df = metrics['information_loss']
-            info_loss_chart = pd.DataFrame(info_loss_df)
-            col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_chart.columns else 'Unique Lost (%)'
-            
-            fig_info_loss = go.Figure()
-            colors = [ACDP_COLORS[3] if v >= 0 else ACDP_COLORS[2] for v in info_loss_chart[col_name]]
-            fig_info_loss.add_trace(go.Bar(
-                x=info_loss_chart['Attribute'],
-                y=info_loss_chart[col_name],
-                name='Unique Change (%)',
-                marker_color=colors
-            ))
-            fig_info_loss.add_trace(go.Bar(
-                x=info_loss_chart['Attribute'],
-                y=info_loss_chart['Entropy Reduction (%)'],
-                name='Entropy Reduction (%)',
-                marker_color=ACDP_COLORS[2]
-            ))
-            
-            fig_info_loss.update_layout(
-                barmode='group',
-                height=400,
-                xaxis_title='Attribute',
-                yaxis_title='Loss (%)',
-                title='Information Loss by Attribute'
-            )
-            
-            st.plotly_chart(fig_info_loss, use_container_width=True)
-            
-            # Distribution Comparison
-            st.markdown("---")
-            st.markdown("**Distribution Comparison**")
-            
-            # Select attribute for comparison
-            comparison_attr = st.selectbox(
-                "Select attribute to compare:",
-                qi_attrs,
-                key="run_comparison"
-            )
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Original Distribution**")
-                orig_dist = df_original[comparison_attr].value_counts().head(10)
-                fig_orig = px.bar(
-                    x=orig_dist.index.astype(str),
-                    y=orig_dist.values,
-                    labels={'x': comparison_attr, 'y': 'Count'},
-                    color_discrete_sequence=[ACDP_COLORS[1]]
-                )
-                fig_orig.update_layout(height=350, showlegend=False)
-                st.plotly_chart(fig_orig, use_container_width=True)
-            
-            with col2:
-                st.markdown("**Anonymized Distribution**")
-                anon_dist = df_anonymized[comparison_attr].value_counts().head(10)
-                fig_anon = px.bar(
-                    x=anon_dist.index.astype(str),
-                    y=anon_dist.values,
-                    labels={'x': comparison_attr, 'y': 'Count'},
-                    color_discrete_sequence=[ACDP_COLORS[0]]
-                )
-                fig_anon.update_layout(height=350, showlegend=False)
-                st.plotly_chart(fig_anon, use_container_width=True)
-            
-            # Data Preview
-            st.markdown("---")
-            st.markdown("**Data Preview**")
-            
-            tab1, tab2 = st.tabs(["Original Data", "Anonymized Data"])
-            
-            with tab1:
-                st.dataframe(df_original.head(20), use_container_width=True)
-            
-            with tab2:
-                st.dataframe(df_anonymized.head(20), use_container_width=True)
-            
-            # Output Files
-            st.markdown("---")
-            st.markdown("**Output Files**")
-            st.info(f"Results saved to: `{custom_output}/`")
-            
-            output_files = [
-                f"- {metadata['dataset_info']['anonymized_file']} (Anonymized dataset)",
-                f"- {metadata['dataset_info']['noisy_counts_file']} (Noisy counts)",
-                f"- acdp_tree_structure.json (Tree structure)",
-                f"- anonymization_metadata.json (Metadata)",
-                f"- evaluation_metrics.json (Evaluation metrics)",
-                f"- evaluation_report.txt (Detailed report)",
-            ]
-            
-            for file_info in output_files:
-                st.markdown(f"- {file_info}")
-            
-            # Console Output
-            with st.expander("Console Output"):
-                st.code(output_buffer.getvalue(), language='text')
-            
-            # Save original data for session state across pages
-            df.to_csv(os.path.join(custom_output, 'original_data.csv'), index=False)
+            # Save to session state
             noisy_file_name = metadata['dataset_info']['noisy_counts_file']
-            df_noisy_loaded = pd.read_csv(os.path.join(custom_output, noisy_file_name))
-
-            # Update session state
+            noisy_path = os.path.join(custom_output, noisy_file_name)
+            df_noisy_loaded = pd.read_csv(noisy_path) if os.path.exists(noisy_path) else None
+            
             st.session_state.has_run = True
             st.session_state.df_original = df
             st.session_state.df_anonymized = df_anonymized
@@ -1042,51 +785,119 @@ def show_run_anonymization():
             st.session_state.records = {'orig': len(df), 'anon': len(df_anonymized)}
             st.session_state.dataset_name = dataset_source
             st.session_state.qi_attrs = qi_attrs
-            st.session_state.sens_attr = sens_attr
+            st.session_state.sens_attrs = sens_attrs
+            st.session_state.sens_attr = sens_attrs[0] if sens_attrs else ''
             st.session_state.output_dir = custom_output
-
-            # Cleanup
-            shutil.rmtree(temp_dir, ignore_errors=True)
-
+            st.session_state.pipeline_logs = full_logs
+            
+            # Show results inline
             st.markdown("---")
-            st.success("**Anonymization complete!** Now showing data for **{}**. Navigate to other pages to explore results.".format(dataset_source))
+            st.success("**Anonymization completed successfully!**")
+            
+            # Summary cards
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Original Records", f"{metadata['dataset_info']['original_records']:,}")
+            with col2:
+                k_satisfied = metadata['privacy_guarantees']['k_anonymity_satisfied']
+                st.metric("K-Anonymity", "✅ Satisfied" if k_satisfied else "❌ Not Satisfied")
+            with col3:
+                utility = metrics['privacy_utility_tradeoff']['utility_score']
+                st.metric("Utility Score", f"{utility:.2f}/100")
+            with col4:
+                privacy_gain = metrics['privacy_utility_tradeoff']['privacy_gain_pct']
+                st.metric("Privacy Gain", f"{privacy_gain:.1f}%")
+            
+            # Tabs for detailed results
+            tab_summary, tab_metrics, tab_logs = st.tabs(["Privacy Details", "Evaluation Metrics", "Full Logs"])
+            
+            with tab_summary:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.success(
+                        f"**K-Anonymity (k={k_anon})**\n\n"
+                        f"- Min group size: {metadata['privacy_guarantees']['min_group_size']}\n"
+                        f"- Max group size: {metadata['privacy_guarantees']['max_group_size']:,}\n"
+                        f"- Avg group size: {metadata['privacy_guarantees']['avg_group_size']:.2f}\n"
+                        f"- Total groups: {metadata['privacy_guarantees']['total_groups']:,}"
+                    )
+                with col2:
+                    st.success(
+                        f"**Differential Privacy (ε={epsilon})**\n\n"
+                        f"- Tree budget: ε={epsilon/2:.2f}\n"
+                        f"- Noise budget: ε={epsilon/2:.2f}\n"
+                        f"- Mean noise: {metadata['pipeline_summary']['noise']['mean_noise']:.4f}\n"
+                        f"- Mean error: {metadata['pipeline_summary']['noise']['mean_percent_error']:.2f}%"
+                    )
+                
+                # Re-identification risk
+                st.markdown("**Re-identification Risk**")
+                risk = metrics['reidentification_risk']
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Original Unique Risk", f"{risk['original']['unique_risk_pct']:.2f}%")
+                with col2:
+                    st.metric("Anonymized Unique Risk", f"{risk['anonymized']['unique_risk_pct']:.2f}%")
+            
+            with tab_metrics:
+                st.dataframe(metrics['information_loss'], width='stretch')
+                st.markdown("**Distribution Preservation**")
+                st.dataframe(metrics['distribution_preservation'], width='stretch')
+                
+                # Information loss chart
+                info_loss_df = metrics['information_loss']
+                info_loss_chart = pd.DataFrame(info_loss_df)
+                col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_chart.columns else 'Unique Lost (%)'
+                
+                fig = go.Figure()
+                colors_il = [ACDP_COLORS[3] if v >= 0 else ACDP_COLORS[2] for v in info_loss_chart[col_name]]
+                fig.add_trace(go.Bar(x=info_loss_chart['Attribute'], y=info_loss_chart[col_name], name='Unique Change (%)', marker_color=colors_il))
+                fig.add_trace(go.Bar(x=info_loss_chart['Attribute'], y=info_loss_chart['Entropy Reduction (%)'], name='Entropy Reduction (%)', marker_color=ACDP_COLORS[2]))
+                fig.update_layout(barmode='group', height=350, title='Information Loss by Attribute')
+                st.plotly_chart(fig, width='stretch')
+            
+            with tab_logs:
+                st.code(full_logs, language='text')
+            
+            # Output files
+            with st.expander("Output Files"):
+                st.info(f"Results saved to: `{custom_output}/`")
+                for fname in [
+                    metadata['dataset_info']['anonymized_file'],
+                    metadata['dataset_info']['noisy_counts_file'],
+                    "acdp_tree_structure.json",
+                    "anonymization_metadata.json",
+                    "evaluation_metrics.json",
+                    "evaluation_report.txt",
+                ]:
+                    st.markdown(f"- {fname}")
+            
+            shutil.rmtree(temp_dir, ignore_errors=True)
             
         except ValueError as e:
-            progress_bar.progress(0)
-            status_text.text("")
             error_msg = str(e)
+            log(f"ERROR: {error_msg}", "❌ Anonymization failed", 0)
             
-            # Provide helpful error messages
             if "not found in dataset columns" in error_msg:
                 st.error("**Configuration Error:** Some selected attributes don't exist in your CSV.")
-                st.warning("**Solution:** Check the attribute names and try again. Make sure you're selecting from the dropdown options only.")
+                st.warning("Make sure you're selecting from the dropdown options only.")
             elif "No valid QI attributes" in error_msg:
                 st.error("**Configuration Error:** No valid QI attributes found.")
-                st.warning("**Solution:** Select at least one valid attribute as QI.")
-            elif "not enough values to unpack" in error_msg or "reshape" in error_msg:
-                st.error("**Data Format Error:** Dataset format is not compatible.")
-                st.warning("**Solution:** Ensure your CSV has:\n- At least 100 rows\n- Valid numeric or categorical columns\n- No completely empty columns")
+                st.warning("Select at least one valid attribute as QI.")
             else:
-                st.error(f"**Error during anonymization:** {error_msg}")
+                st.error(f"**Error:** {error_msg}")
             
-            with st.expander("Full Error Details"):
+            with st.expander("Error Details"):
                 import traceback
                 st.code(traceback.format_exc())
-            
-            # Cleanup
             shutil.rmtree(temp_dir, ignore_errors=True)
             
         except Exception as e:
-            progress_bar.progress(0)
-            status_text.text("")
+            log(f"UNEXPECTED ERROR: {str(e)}", "❌ Anonymization failed", 0)
             st.error(f"**Unexpected error:** {str(e)}")
-            st.warning("Your dataset might have special characters, encoding issues, or unusual data types.")
-            
-            with st.expander("Full Error Details"):
+            with st.expander("Error Details"):
                 import traceback
                 st.code(traceback.format_exc())
-            
-            # Cleanup
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
@@ -1104,6 +915,7 @@ def main():
         st.session_state.records = {'orig': 0, 'anon': 0}
         st.session_state.dataset_name = os.path.basename(RAW_DATA_PATH)
         st.session_state.qi_attrs = QI_ATTRIBUTES
+        st.session_state.sens_attrs = SENSITIVE_ATTRIBUTES
         st.session_state.sens_attr = SENSITIVE_ATTRIBUTE
 
         df_original, df_anonymized, df_noisy, cached_metrics, success = load_data()
@@ -1139,7 +951,8 @@ def main():
     df_noisy = st.session_state.df_noisy
     cached_metrics = st.session_state.cached_metrics
     qi_attrs = st.session_state.qi_attrs
-    sens_attr = st.session_state.sens_attr
+    sens_attrs = st.session_state.get('sens_attrs', SENSITIVE_ATTRIBUTES)
+    sens_attr = sens_attrs[0] if sens_attrs else ''
     p = st.session_state.params
 
     if df_original is None:
@@ -1212,17 +1025,17 @@ def main():
     elif page == "Overview":
         show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, tradeoff)
     elif page == "Data Comparison":
-        show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attr)
+        show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attrs)
     elif page == "Privacy Metrics":
         show_privacy_metrics(orig_risk, anon_risk, df_noisy)
     elif page == "Utility Metrics":
         show_utility_metrics(info_loss, dist_preserve, tradeoff)
     elif page == "Visualizations":
-        show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_preserve, sens_attr)
+        show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_preserve, sens_attrs)
     elif page == "Tree Simulation":
         show_tree_simulation(df_original, df_anonymized, qi_attrs)
     elif page == "Algorithm Comparison":
-        show_algorithm_comparison(df_original, qi_attrs, sens_attr)
+        show_algorithm_comparison(df_original, qi_attrs, sens_attrs)
 
 def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, tradeoff):
     """Overview page with key metrics"""
@@ -1301,9 +1114,9 @@ def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, t
         ]
     }
     
-    st.dataframe(pd.DataFrame(summary_data), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(summary_data), width='stretch', hide_index=True)
 
-def show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attr):
+def show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attrs):
     """Data comparison page"""
     st.markdown("### Data Comparison")
     
@@ -1323,7 +1136,7 @@ def show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attr):
             color_discrete_sequence=[ACDP_COLORS[1]]
         )
         fig1.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width='stretch')
     
     with col2:
         st.markdown("**Anonymized Distribution**")
@@ -1335,14 +1148,14 @@ def show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attr):
             color_discrete_sequence=[ACDP_COLORS[0]]
         )
         fig2.update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
     
     # Side-by-side comparison
     st.markdown("---")
     st.markdown("**Side-by-Side Comparison**")
     
     comparison_df = pd.DataFrame({
-        'Value': orig_counts.index.astype(str),
+        'Value': orig_counts.index.astype(str).tolist(),
         'Original': orig_counts.values,
         'Anonymized': anon_counts.reindex(orig_counts.index, fill_value=0).values
     })
@@ -1351,21 +1164,23 @@ def show_data_comparison(df_original, df_anonymized, qi_attrs, sens_attr):
     fig3.add_trace(go.Bar(name='Original', x=comparison_df['Value'], y=comparison_df['Original'], marker_color=ACDP_COLORS[1]))
     fig3.add_trace(go.Bar(name='Anonymized', x=comparison_df['Value'], y=comparison_df['Anonymized'], marker_color=ACDP_COLORS[0]))
     fig3.update_layout(barmode='group', height=400, xaxis_title=selected_attr, yaxis_title='Count')
-    st.plotly_chart(fig3, use_container_width=True)
+    st.plotly_chart(fig3, width='stretch')
     
     # Data preview
     st.markdown("---")
     st.markdown("#### Data Preview")
     
+    display_cols = qi_attrs + sens_attrs
+    
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("**Original Data (first 10 rows)**")
-        st.dataframe(df_original[qi_attrs + [sens_attr]].head(10), use_container_width=True)
+        st.dataframe(df_original[display_cols].head(10), width='stretch')
     
     with col2:
         st.markdown("**Anonymized Data (first 10 rows)**")
-        st.dataframe(df_anonymized[qi_attrs + [sens_attr]].head(10), use_container_width=True)
+        st.dataframe(df_anonymized[display_cols].head(10), width='stretch')
 
 def show_privacy_metrics(orig_risk, anon_risk, df_noisy):
     """Privacy metrics page"""
@@ -1387,7 +1202,7 @@ def show_privacy_metrics(orig_risk, anon_risk, df_noisy):
         fig.add_trace(go.Bar(name='Unique Risk', x=risk_data['Dataset'], y=risk_data['Unique Risk (%)'], marker_color=ACDP_COLORS[0]))
         fig.add_trace(go.Bar(name='Small Group Risk', x=risk_data['Dataset'], y=risk_data['Small Group Risk (%)'], marker_color=ACDP_COLORS[2]))
         fig.update_layout(barmode='group', height=400, yaxis_title='Risk (%)', title='Re-identification Risk Comparison')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.markdown("**Risk Metrics**")
@@ -1410,7 +1225,7 @@ def show_privacy_metrics(orig_risk, anon_risk, df_noisy):
             ]
         })
         
-        st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+        st.dataframe(metrics_df, width='stretch', hide_index=True)
     
     # Differential Privacy noise
     st.markdown("---")
@@ -1429,7 +1244,7 @@ def show_privacy_metrics(orig_risk, anon_risk, df_noisy):
         fig.add_vline(x=0, line_dash="dash", line_color=ACDP_COLORS[3], annotation_text="No Noise")
         fig.add_vline(x=df_noisy['noise_added'].mean(), line_dash="dash", line_color=ACDP_COLORS[0],
                      annotation_text=f"Mean={df_noisy['noise_added'].mean():.2f}")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         fig = px.scatter(
@@ -1443,7 +1258,7 @@ def show_privacy_metrics(orig_risk, anon_risk, df_noisy):
         max_val = max(df_noisy['count'].max(), df_noisy['noisy_count'].max())
         fig.add_trace(go.Scatter(x=[0, max_val], y=[0, max_val], mode='lines',
                                 name='Perfect Match', line=dict(color=ACDP_COLORS[3], dash='dash')))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 def show_utility_metrics(info_loss, dist_preserve, tradeoff):
     """Utility metrics page"""
@@ -1465,7 +1280,7 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
                 marker_color=colors,
             ))
         fig.update_layout(height=400, yaxis_title='Unique Change (%)')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         fig = px.bar(
@@ -1475,7 +1290,7 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
             color_discrete_sequence=[ACDP_COLORS[2]],
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Distribution preservation
     st.markdown("---")
@@ -1493,7 +1308,7 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
         )
         fig.add_hline(y=0.5, line_dash="dash", line_color=ACDP_COLORS[2], annotation_text="Good/Fair Threshold")
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         fig = px.bar(
@@ -1503,7 +1318,7 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
             color_discrete_sequence=[ACDP_COLORS[2]],
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Privacy-Utility Tradeoff
     st.markdown("---")
@@ -1551,13 +1366,22 @@ def show_utility_metrics(info_loss, dist_preserve, tradeoff):
         height=500
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
-def show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_preserve, sens_attr):
+def show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_preserve, sens_attrs):
     """Additional visualizations page"""
     st.markdown("### Visualizations")
     
-    st.markdown("**Sensitive Attribute Distribution**")
+    sens_attr = st.selectbox(
+        "Select Sensitive Attribute to Visualize:",
+        options=sens_attrs if sens_attrs else ['None'],
+        key="viz_sens_attr"
+    )
+    if sens_attr == 'None' or sens_attr not in df_original.columns:
+        st.warning("No valid sensitive attribute selected.")
+        return
+    
+    st.markdown(f"**Sensitive Attribute Distribution: {sens_attr}**")
     
     orig_sens = df_original[sens_attr].value_counts(normalize=True).sort_index() * 100
     anon_sens = df_anonymized[sens_attr].value_counts(normalize=True).sort_index() * 100
@@ -1576,7 +1400,7 @@ def show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_pr
         fig.add_trace(go.Bar(name='Original', x=sens_df['Class'], y=sens_df['Original'], marker_color=ACDP_COLORS[1]))
         fig.add_trace(go.Bar(name='Anonymized', x=sens_df['Class'], y=sens_df['Anonymized'], marker_color=ACDP_COLORS[0]))
         fig.update_layout(barmode='group', height=400, yaxis_title='Percentage (%)')
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         fig = px.pie(
@@ -1586,7 +1410,7 @@ def show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_pr
             color_discrete_sequence=[ACDP_COLORS[0], ACDP_COLORS[2], ACDP_COLORS[3]]
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # All attributes overview
     st.markdown("---")
@@ -1595,10 +1419,10 @@ def show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_pr
     tab1, tab2 = st.tabs(["Information Loss", "Distribution Preservation"])
     
     with tab1:
-        st.dataframe(info_loss, use_container_width=True, hide_index=True)
+        st.dataframe(info_loss, width='stretch', hide_index=True)
     
     with tab2:
-        st.dataframe(dist_preserve, use_container_width=True, hide_index=True)
+        st.dataframe(dist_preserve, width='stretch', hide_index=True)
 
 def show_tree_simulation(df_original, df_anonymized, qi_attrs):
     """Tree simulation page with REAL ACDP Tree structure"""
@@ -1673,7 +1497,7 @@ def show_tree_simulation(df_original, df_anonymized, qi_attrs):
         fig = create_treemap_visualization(tree_with_noise)
     
     if fig:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.warning("Tree visualization could not be generated.")
     
@@ -2033,7 +1857,7 @@ def create_tree_visualization(tree_data):
     
     return fig
 
-def show_algorithm_comparison(df_original, qi_attrs, sens_attr):
+def show_algorithm_comparison(df_original, qi_attrs, sens_attrs):
     """Algorithm comparison page"""
     st.markdown("### Algorithm Comparison")
     
@@ -2057,8 +1881,9 @@ def show_algorithm_comparison(df_original, qi_attrs, sens_attr):
             st.markdown(f"- {attr}")
     
     with col2:
-        st.markdown("**Sensitive Attribute:**")
-        st.markdown(f"- {sens_attr}")
+        st.markdown("**Sensitive Attribute(s):**")
+        for sa in sens_attrs:
+            st.markdown(f"- {sa}")
     
     with col3:
         epsilon_eval = st.selectbox("Privacy Budget (ε)", [1.0, 0.5, 0.1], index=1, key="eval_epsilon")
@@ -2103,17 +1928,17 @@ def show_algorithm_comparison(df_original, qi_attrs, sens_attr):
     
     with col1:
         fig1 = create_comparison_chart(metrics_data['rows'], 'information_loss', 'Information Loss')
-        st.plotly_chart(fig1, use_container_width=True)
+        st.plotly_chart(fig1, width='stretch')
         
         fig3 = create_comparison_chart(metrics_data['rows'], 'data_leakage_probability', 'Data Leakage Probability')
-        st.plotly_chart(fig3, use_container_width=True)
+        st.plotly_chart(fig3, width='stretch')
     
     with col2:
         fig2 = create_comparison_chart(metrics_data['rows'], 'absolute_error', 'Absolute Error')
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
         
         fig4 = create_comparison_chart(metrics_data['rows'], 'execution_time', 'Execution Time (s)')
-        st.plotly_chart(fig4, use_container_width=True)
+        st.plotly_chart(fig4, width='stretch')
     
     # Metric descriptions
     st.markdown("---")
@@ -2152,7 +1977,7 @@ def show_algorithm_comparison(df_original, qi_attrs, sens_attr):
     st.markdown("**Full Comparison Table**")
     
     df_table = pd.DataFrame(metrics_data['rows'])
-    st.dataframe(df_table, use_container_width=True, hide_index=True)
+    st.dataframe(df_table, width='stretch', hide_index=True)
     
     st.info("Catatan: Nilai metrik pada dashboard ini adalah simulasi untuk demonstrasi. "
             "Untuk hasil penelitian final, hubungkan dengan function di `src/metrics.py`.")

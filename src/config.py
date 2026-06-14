@@ -1,14 +1,8 @@
-"""
-Configuration for ACDP Tree Privacy Pipeline.
-Edit this file to configure your dataset and privacy parameters.
-"""
-
-
 DATASET_CONFIG = {
     'file_path': 'data/raw/diabetes__health_indicators.csv',
     'identifier_attributes': [],
     'qi_attributes': ['Age', 'Sex', 'Education', 'Income', 'BMI', 'GenHlth'],
-    'sensitive_attribute': 'Diabetes_012',
+    'sensitive_attribute': ['Diabetes_012'],
     'non_sensitive_attributes': [],
 }
 

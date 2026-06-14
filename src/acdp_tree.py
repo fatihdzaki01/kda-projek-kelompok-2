@@ -1,79 +1,40 @@
-"""
-ACDP Tree (Generalization Optimizer).
-
-Contains weighted mutual information, inverse frequency weights,
-ACDPTreeNode, and ACDPTree classes.
-"""
-
 import numpy as np
 import pandas as pd
 from collections import Counter
+from src.utils import ensure_list
+
+
+def _weighted_entropy(series, weights):
+    w_total = weights.sum()
+    if w_total == 0:
+        return 0.0
+
+    n_unique = series.nunique()
+    is_continuous = (
+        pd.api.types.is_float_dtype(series) and n_unique > 20
+    ) or (n_unique > len(series) * 0.5)
+
+    if is_continuous:
+        n_bins = min(20, max(5, len(series) // 100))
+        try:
+            binned = pd.cut(series, bins=n_bins, duplicates='drop')
+            grouped = weights.groupby(binned, sort=False).sum()
+        except Exception:
+            grouped = weights.groupby(series, sort=False).sum()
+    else:
+        grouped = weights.groupby(series, sort=False).sum()
+
+    p = grouped.values / w_total
+    p = p[p > 0]
+    return -np.sum(p * np.log2(p))
 
 
 def weighted_mutual_info(feature, target, weights):
-    """
-    Hitung Weighted Mutual Information antara feature dan target.
-    Digunakan sebagai split criteria di ACDP Tree.
-    
-    Handles both discrete and continuous target variables.
-
-    Args:
-        feature  : pd.Series -> nilai fitur (QI attribute)
-        target   : pd.Series -> sensitive attribute (discrete or continuous)
-        weights  : pd.Series -> bobot per record
-
-    Returns:
-        float -> nilai WMI (makin tinggi = makin baik untuk split)
-    """
     total_weight = weights.sum()
     if total_weight == 0:
         return 0.0
 
-    def weighted_entropy(t, w):
-        """Hitung entropy berbobot (handles continuous via binning)"""
-        w_total = w.sum()
-        if w_total == 0:
-            return 0.0
-        
-        # Check if target is continuous
-        n_unique = t.nunique()
-        is_continuous = (pd.api.types.is_float_dtype(t) and n_unique > 20) or (n_unique > len(t) * 0.5)
-        
-        if is_continuous:
-            # For continuous target, bin the values
-            n_bins = min(20, max(5, len(t) // 100))
-            try:
-                t_binned = pd.cut(t, bins=n_bins, duplicates='drop')
-                classes = t_binned.cat.categories
-                entropy = 0.0
-                for c in classes:
-                    mask = (t_binned == c)
-                    if mask.sum() > 0:
-                        p = w[mask].sum() / w_total
-                        if p > 0:
-                            entropy -= p * np.log2(p)
-            except Exception:
-                # Fallback: treat as discrete
-                classes = t.unique()
-                entropy = 0.0
-                for c in classes:
-                    mask = (t == c)
-                    p = w[mask].sum() / w_total
-                    if p > 0:
-                        entropy -= p * np.log2(p)
-        else:
-            # For discrete target
-            classes = t.unique()
-            entropy = 0.0
-            for c in classes:
-                mask = (t == c)
-                p = w[mask].sum() / w_total
-                if p > 0:
-                    entropy -= p * np.log2(p)
-        
-        return entropy
-
-    h_target = weighted_entropy(target, weights)
+    h_target = _weighted_entropy(target, weights)
 
     h_conditional = 0.0
     for val in feature.unique():
@@ -81,43 +42,35 @@ def weighted_mutual_info(feature, target, weights):
         w_subset = weights[mask]
         t_subset = target[mask]
         p_val = w_subset.sum() / total_weight
-        h_conditional += p_val * weighted_entropy(t_subset, w_subset)
+        if p_val > 0:
+            h_conditional += p_val * _weighted_entropy(t_subset, w_subset)
 
-    wmi = h_target - h_conditional
-    return max(0.0, wmi)
+    return max(0.0, h_target - h_conditional)
 
 
 def compute_inverse_frequency_weights(df, target_col):
-    """
-    Hitung bobot per record menggunakan inverse frequency.
-    Kelas minoritas dapat bobot lebih tinggi.
+    target_cols = ensure_list(target_col)
+    if not target_cols:
+        print('  Warning: No target columns specified, using uniform weights')
+        return pd.Series(np.ones(len(df)), index=df.index)
 
-    Formula: weight = total / (n_classes x count_per_class)
+    primary_target = target_cols[0]
 
-    Args:
-        df         : pd.DataFrame
-        target_col : str -> nama kolom target
-
-    Returns:
-        pd.Series -> bobot per record (index sama dengan df)
-    """
-    # Handle edge cases
     if len(df) == 0:
         return pd.Series([], dtype=float)
-    
-    if target_col not in df.columns:
-        print(f'  Warning: Target column "{target_col}" not found, using uniform weights')
+
+    if primary_target not in df.columns:
+        print(f'  Warning: Target column "{primary_target}" not found, using uniform weights')
         return pd.Series(np.ones(len(df)), index=df.index)
-    
-    # Handle NaN values in target
-    if df[target_col].isna().all():
-        print(f'  Warning: All values in "{target_col}" are NaN, using uniform weights')
+
+    if df[primary_target].isna().all():
+        print(f'  Warning: All values in "{primary_target}" are NaN, using uniform weights')
         return pd.Series(np.ones(len(df)), index=df.index)
-    
-    counts = Counter(df[target_col].dropna())
+
+    counts = Counter(df[primary_target].dropna())
     total = len(df)
     n_cls = len(counts)
-    
+
     if n_cls == 0:
         return pd.Series(np.ones(len(df)), index=df.index)
 
@@ -126,9 +79,7 @@ def compute_inverse_frequency_weights(df, target_col):
         for cls, cnt in counts.items()
     }
 
-    weights = df[target_col].map(class_weights)
-    
-    # Fill NaN weights with 1.0
+    weights = df[primary_target].map(class_weights)
     weights = weights.fillna(1.0)
 
     print('Inverse Frequency Weights:')
@@ -143,17 +94,6 @@ def compute_inverse_frequency_weights(df, target_col):
 
 
 def exponential_mechanism_select(scores, epsilon, sensitivity):
-    """
-    Select an index using the Exponential Mechanism.
-
-    Args:
-        scores (list): Score values for each candidate
-        epsilon (float): Privacy budget for this selection
-        sensitivity (float): Sensitivity of the score function
-
-    Returns:
-        int: Selected index
-    """
     if epsilon <= 0 or len(scores) == 0:
         return np.random.randint(len(scores))
 
@@ -168,12 +108,6 @@ def exponential_mechanism_select(scores, epsilon, sensitivity):
 
 
 class ACDPTreeNode:
-    """
-    Representasi satu node di ACDP Tree.
-
-    Decision Node : memilih attribute & level generalisasi terbaik
-    Leaf Node     : menyimpan final generalization levels per record
-    """
 
     def __init__(self):
         self.is_leaf = False
@@ -186,18 +120,6 @@ class ACDPTreeNode:
 
 
 class ACDPTree:
-    """
-    ACDP Tree: Generalization Optimizer
-
-    Fungsi:
-    - Decide attribute mana yang di-generalisasi
-    - Decide level berapa untuk setiap attribute
-    - Output: per-record generalization decision
-
-    Stopping criteria (mana yang tercapai duluan):
-    - Max depth tercapai
-    - Semua group dalam node sudah >= k
-    """
 
     def __init__(
         self,
@@ -213,7 +135,8 @@ class ACDPTree:
     ):
         self.hierarchy = hierarchy
         self.qi_attributes = qi_attributes
-        self.sensitive_attribute = sensitive_attribute
+        self.sensitive_attributes = ensure_list(sensitive_attribute)
+        self.sensitive_attribute = self.sensitive_attributes[0] if self.sensitive_attributes else ''
         self.k = k
         self.max_depth = max_depth if max_depth else (max_tree_depth or 4)
         self.weights = weights
@@ -221,13 +144,33 @@ class ACDPTree:
         self.epsilon_tree = epsilon_tree
         self.root = None
         self.record_levels = {}
+        self._gen_cache = {}
+
+    def _get_gen_mapping(self, attr, level):
+        if level == 0:
+            return {}
+        key = (attr, level)
+        if key in self._gen_cache:
+            return self._gen_cache[key]
+        h = self.hierarchy.hierarchies.get(attr, {})
+        max_lvl = h.get('max_level', 3)
+        if level >= max_lvl:
+            self._gen_cache[key] = None
+            return None
+        mapping = h.get('mapping', {}).get(level, {})
+        if not mapping:
+            self._gen_cache[key] = None
+            return None
+        self._gen_cache[key] = mapping
+        return mapping
+
+    def _generalize_series(self, series, attr, level):
+        mapping = self._get_gen_mapping(attr, level)
+        if mapping is None:
+            return pd.Series('Any', index=series.index)
+        return series.map(mapping).fillna('Any')
 
     def _compute_epsilon_level(self, depth, h):
-        """Compute privacy budget for a given tree level using arithmetic progression.
-
-        Formula (paper): epsilon_level = epsilon / (h+1) + (h/2 - depth) * d
-        where d = 2 * epsilon / (h * (h+1))
-        """
         if self.epsilon_tree is None or h <= 0:
             return None
         d = 2.0 * self.epsilon_tree / (h * (h + 1))
@@ -235,52 +178,40 @@ class ACDPTree:
         return max(eps, 1e-6)
 
     def _get_sensitivity(self, df):
-        """Compute sensitivity for Exponential Mechanism: log2(n_classes)."""
-        n_classes = df[self.sensitive_attribute].nunique()
+        if self.sensitive_attribute and self.sensitive_attribute in df.columns:
+            n_classes = df[self.sensitive_attribute].nunique()
+        else:
+            n_classes = 2
         return np.log2(max(n_classes, 2))
 
     def _check_k_satisfied(self, df):
-        """Cek apakah semua group di df sudah >= k"""
         if len(df) == 0:
             return True
         groups = df.groupby(self.qi_attributes).size()
         return (groups >= self.k).all()
 
     def _get_current_generalized(self, df_original, current_levels):
-        """Apply current_levels ke df_original untuk dapat nilai tergeneralisasi."""
         df_gen = df_original.copy()
         for attr, level in current_levels.items():
             if level > 0:
-                df_gen[attr] = df_original[attr].apply(
-                    lambda x: self.hierarchy.generalize(attr, x, level)
-                )
+                df_gen[attr] = self._generalize_series(df_original[attr], attr, level).astype(object)
         return df_gen
 
     def _select_best_split(self, df_original, current_levels, available_attrs, epsilon_level):
-        """
-        Pilih attribute & level terbaik untuk split berikutnya
-        menggunakan Exponential Mechanism + Weighted Mutual Information.
-
-        Untuk continuous attributes: Exponential Mechanism memilih split point
-        dari candidates dengan probabilitas proportional ke exp(eps * score / (2 * delta)).
-
-        Untuk discrete attributes: WMI langsung digunakan sebagai score.
-        """
         candidates = []
 
         w = self.weights.loc[df_original.index] if self.weights is not None \
             else pd.Series(np.ones(len(df_original)), index=df_original.index)
 
-        target = df_original[self.sensitive_attribute]
+        target = df_original[self.sensitive_attribute] if self.sensitive_attribute and self.sensitive_attribute in df_original.columns \
+            else pd.Series(np.zeros(len(df_original)), index=df_original.index)
 
         for attr in available_attrs:
             current_level = current_levels.get(attr, 0)
             max_level = self.hierarchy.get_max_level(attr)
 
             for next_level in range(current_level + 1, max_level + 1):
-                gen_values = df_original[attr].apply(
-                    lambda x: self.hierarchy.generalize(attr, x, next_level)
-                )
+                gen_values = self._generalize_series(df_original[attr], attr, next_level)
 
                 wmi = weighted_mutual_info(gen_values, target, w)
 
@@ -293,28 +224,22 @@ class ACDPTree:
         if not candidates:
             return None, None, -1
 
-        # Use attribute_ranking as tiebreaker if available
         if self.attribute_ranking:
             rank_order = {attr: i for i, attr in enumerate(self.attribute_ranking)}
             for c in candidates:
                 c['rank'] = rank_order.get(c['attribute'], 999)
 
         if epsilon_level is not None and epsilon_level > 0:
-            # Exponential Mechanism selection
             scores = [c['wmi'] for c in candidates]
             sensitivity = self._get_sensitivity(df_original)
             selected_idx = exponential_mechanism_select(scores, epsilon_level, sensitivity)
             best = candidates[selected_idx]
         else:
-            # Deterministic: best WMI, tiebreak by ACE ranking
             best = max(candidates, key=lambda c: (c['wmi'], -c.get('rank', 999)))
 
         return best['attribute'], best['level'], best['wmi']
 
     def _build(self, df_original, current_levels, available_attrs, depth, tree_height):
-        """
-        Rekursif build ACDP Tree.
-        """
         node = ACDPTreeNode()
         node.depth = depth
         node.record_indices = list(df_original.index)
@@ -331,7 +256,6 @@ class ACDPTree:
             node.final_levels = current_levels.copy()
             return node
 
-        # Compute privacy budget for this level
         eps_level = self._compute_epsilon_level(depth, tree_height)
 
         best_attr, best_level, best_wmi = self._select_best_split(
@@ -353,9 +277,7 @@ class ACDPTree:
             if best_level >= self.hierarchy.get_max_level(best_attr) \
             else available_attrs
 
-        gen_values = df_original[best_attr].apply(
-            lambda x: self.hierarchy.generalize(best_attr, x, best_level)
-        )
+        gen_values = self._generalize_series(df_original[best_attr], best_attr, best_level)
 
         for val in gen_values.unique():
             mask = (gen_values == val)
@@ -376,15 +298,11 @@ class ACDPTree:
         return node
 
     def _compute_tree_height(self, df):
-        """Estimate tree height for budget allocation."""
         if self.max_depth:
             return self.max_depth
         return min(len(self.qi_attributes), 4)
 
     def fit(self, df):
-        """
-        Build ACDP Tree dari dataset.
-        """
         print('=' * 80)
         print('BUILDING ACDP TREE (Generalization Optimizer)')
         print('=' * 80)
@@ -392,11 +310,14 @@ class ACDPTree:
         print(f'  k-anonymity  : {self.k}')
         print(f'  Max depth    : {self.max_depth}')
         print(f'  QI Attributes: {self.qi_attributes}')
+        print(f'  Sensitive Attr(s): {self.sensitive_attributes}')
         if self.attribute_ranking:
             print(f'  ACE Ranking  : {list(self.attribute_ranking.keys())}')
         if self.epsilon_tree is not None:
             print(f'  DP budget    : epsilon={self.epsilon_tree:.4f} (tree construction)')
         print('=' * 80)
+
+        self._gen_cache = {}
 
         initial_levels = {attr: 0 for attr in self.qi_attributes}
         tree_height = self._compute_tree_height(df)
@@ -417,7 +338,6 @@ class ACDPTree:
         return self
 
     def _collect_record_levels(self, node):
-        """Rekursif collect final levels untuk setiap record"""
         if node is None:
             return
 
@@ -434,9 +354,6 @@ class ACDPTree:
                 self.record_levels[idx] = node.final_levels.copy()
 
     def transform(self, df):
-        """
-        Apply per-record generalization decisions ke dataset.
-        """
         df_result = df.copy()
 
         for attr in self.qi_attributes:
@@ -456,9 +373,6 @@ class ACDPTree:
         return df_result
 
     def get_generalization_summary(self):
-        """
-        Summary statistik generalization levels yang diputuskan tree.
-        """
         if not self.record_levels:
             print('Tree belum di-fit!')
             return None
@@ -479,19 +393,11 @@ class ACDPTree:
 
         return pd.DataFrame(summary_data)
 
-
     def export_tree_structure(self):
-        """
-        Export tree structure to JSON-serializable format for visualization.
-        
-        Returns:
-            dict: Tree structure with nodes and their properties
-        """
         def node_to_dict(node, depth=0):
-            """Convert ACDPTreeNode to dictionary"""
             if node is None:
                 return None
-            
+
             node_dict = {
                 'depth': depth,
                 'is_leaf': node.is_leaf,
@@ -501,29 +407,28 @@ class ACDPTree:
                 'final_levels': node.final_levels if node.is_leaf else None,
                 'children': []
             }
-            
-            # Add children
+
             if not node.is_leaf and node.children:
                 for value, child_node in node.children.items():
                     child_dict = node_to_dict(child_node, depth + 1)
                     if child_dict:
                         child_dict['parent_value'] = str(value)
                         node_dict['children'].append(child_dict)
-            
+
             return node_dict
-        
+
         if self.root is None:
             return None
-        
+
         tree_structure = {
             'metadata': {
                 'k_anonymity': self.k,
                 'max_depth': self.max_depth,
                 'qi_attributes': self.qi_attributes,
-                'sensitive_attribute': self.sensitive_attribute,
+                'sensitive_attributes': self.sensitive_attributes,
                 'total_records': len(self.record_levels)
             },
             'tree': node_to_dict(self.root)
         }
-        
+
         return tree_structure
