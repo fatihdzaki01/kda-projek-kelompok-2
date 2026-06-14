@@ -62,7 +62,7 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
                 'Attribute': attr,
                 'Original Unique': orig_unique,
                 'Anonymized Unique': anon_unique,
-                'Unique Lost (%)': round(unique_lost_pct, 2),
+                'Unique Change (%)': round(unique_lost_pct, 2),
                 'Entropy Reduction (%)': round(entropy_reduction, 2),
             })
         except Exception as e:
@@ -71,7 +71,7 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
                 'Attribute': attr,
                 'Original Unique': 0,
                 'Anonymized Unique': 0,
-                'Unique Lost (%)': 0.0,
+                'Unique Change (%)': 0.0,
                 'Entropy Reduction (%)': 0.0,
             })
 
@@ -230,11 +230,14 @@ def calculate_privacy_utility_tradeoff(
     )
 
     # Utility loss (0-100, lower = better)
-    avg_info_loss = info_loss_df['Unique Lost (%)'].mean()
+    col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_df.columns else 'Unique Lost (%)'
+    avg_info_loss = info_loss_df[col_name].mean()
     avg_kl_div = dist_preserve_df['KL-Divergence'].mean()
 
     # Combined utility score (0-100, higher = better)
+    # Cap between 0 and 100 to handle edge cases
     utility_score = 100 - avg_info_loss
+    utility_score = max(0, min(100, utility_score))  # Clamp to [0, 100]
 
     # Privacy-Utility Ratio
     pu_ratio = privacy_gain / (avg_info_loss + 1e-10)

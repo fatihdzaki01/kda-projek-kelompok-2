@@ -196,9 +196,10 @@ def plot_information_loss(info_loss_df):
     """Plot information loss per attribute."""
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-    axes[0].barh(info_loss_df['Attribute'], info_loss_df['Unique Lost (%)'],
+    col_name = 'Unique Change (%)' if 'Unique Change (%)' in info_loss_df.columns else 'Unique Lost (%)'
+    axes[0].barh(info_loss_df['Attribute'], info_loss_df[col_name],
                  color='coral', edgecolor='white')
-    axes[0].set_xlabel('Unique Values Lost (%)', fontweight='bold')
+    axes[0].set_xlabel('Unique Values Change (%)', fontweight='bold')
     axes[0].set_title('Information Loss per Attribute', fontweight='bold')
     axes[0].grid(alpha=0.3, axis='x')
 

@@ -300,7 +300,7 @@ class TestMetrics(unittest.TestCase):
         loss = calculate_information_loss(self.orig, self.anon, self.qi)
         self.assertEqual(len(loss), 2)
         self.assertIn('Attribute', loss.columns)
-        self.assertIn('Unique Lost (%)', loss.columns)
+        self.assertIn('Unique Change (%)', loss.columns)
 
     def test_kl_divergence(self):
         kl = calculate_kl_divergence(self.orig, self.anon, self.qi)
