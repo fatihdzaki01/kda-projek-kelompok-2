@@ -1303,7 +1303,7 @@ def main():
     st.sidebar.markdown("### Navigation")
     page = st.sidebar.radio(
         "Go to",
-        ["Run Anonymization", "Overview", "Data Comparison", "Privacy Metrics", "Utility Metrics", "Visualizations", "Tree Simulation", "Algorithm Comparison"],
+        ["Run Anonymization", "Overview", "Data Comparison", "Privacy Metrics", "Utility Metrics", "Visualizations", "Tree Simulation"],  # Algorithm Comparison hidden
         label_visibility="collapsed"
     )
 
@@ -1370,8 +1370,8 @@ def main():
         show_visualizations(df_original, df_anonymized, df_noisy, info_loss, dist_preserve, sens_attr)
     elif page == "Tree Simulation":
         show_tree_simulation(df_original, df_anonymized, qi_attrs)
-    elif page == "Algorithm Comparison":
-        show_algorithm_comparison(df_original, qi_attrs, sens_attr)
+    # elif page == "Algorithm Comparison":  # Hidden - focus on real implementation results
+    #     show_algorithm_comparison(df_original, qi_attrs, sens_attr)
 
 def show_overview(df_original, df_anonymized, info_loss, orig_risk, anon_risk, tradeoff):
     """Overview page with key metrics"""
