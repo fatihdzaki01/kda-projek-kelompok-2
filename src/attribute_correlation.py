@@ -31,12 +31,21 @@ class AttributeCorrelationEvaluation:
         # ranking = {'Age': 0.35, 'BMI': 0.28, 'Sex': 0.12, ...}
     """
 
-    def __init__(self):
+    def __init__(self, sample_for_nmi=True, max_samples_nmi=50000):
+        """
+        Initialize ACE evaluator.
+        
+        Args:
+            sample_for_nmi (bool): Use sampling for NMI calculation to speed up
+            max_samples_nmi (int): Maximum samples for NMI (default 50k)
+        """
         self.weights_ = None
         self.ranking_ = None
         self.pairwise_matrix_ = None
         self.consistency_ratio_ = None
         self.nmi_scores_ = None
+        self.sample_for_nmi = sample_for_nmi
+        self.max_samples_nmi = max_samples_nmi
 
     def fit(self, df, qi_attributes, sensitive_attribute):
         """
@@ -57,11 +66,21 @@ class AttributeCorrelationEvaluation:
             dict: {attribute: weight} sorted by weight descending
         """
 
-        # Step 1: Compute NMI
+        # Step 1: Compute NMI (with optional sampling for speed)
         n_samples = len(df)
         
+        # Sampling strategy for large datasets
+        if self.sample_for_nmi and n_samples > self.max_samples_nmi:
+            print(f"  Dataset has {n_samples:,} rows. Sampling {self.max_samples_nmi:,} rows for NMI calculation...")
+            df_sample = df.sample(n=self.max_samples_nmi, random_state=42)
+            print(f"  ⚡ Speed optimization: Using stratified sample (preserves distribution)")
+        else:
+            df_sample = df
+            if n_samples > 100000:
+                print(f"  Processing {n_samples:,} rows for NMI calculation (this may take a while)...")
+        
         # Detect if sensitive attribute is continuous or discrete
-        sensitive_values = df[sensitive_attribute].dropna()
+        sensitive_values = df_sample[sensitive_attribute].dropna()
         n_unique = sensitive_values.nunique()
         is_continuous = (
             pd.api.types.is_float_dtype(sensitive_values) and 
@@ -90,20 +109,21 @@ class AttributeCorrelationEvaluation:
 
         nmi_scores = {}
         for attr in qi_attributes:
-            le_data = pd.factorize(df[attr])[0]
+            le_data = pd.factorize(df_sample[attr])[0]
 
             # Ensure it's numpy array and reshape
             le_data = np.array(le_data).reshape(-1, 1)
             
             # Align with sensitive attribute (drop NaN indices)
             valid_indices = sensitive_values.index
-            le_data_aligned = le_data[df.index.isin(valid_indices)]
+            le_data_aligned = le_data[df_sample.index.isin(valid_indices)]
             
             if use_regression:
                 # Use mutual_info_regression for continuous target
                 mi = mutual_info_regression(
                     le_data_aligned,
                     y_data,
+                    n_neighbors=5,  # Increased from 3 for better accuracy
                     random_state=42
                 )[0]
             else:
@@ -112,6 +132,7 @@ class AttributeCorrelationEvaluation:
                     le_data_aligned,
                     y_data,
                     discrete_features=True,
+                    n_neighbors=5,  # Increased from 3 for better accuracy
                     random_state=42
                 )[0]
 

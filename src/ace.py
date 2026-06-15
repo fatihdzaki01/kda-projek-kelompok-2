@@ -19,35 +19,63 @@ class KAnonymityEnforcer:
     - Selalu generalize dari ORIGINAL values
     """
 
-    def __init__(self, k=5, hierarchy=None, qi_attributes=None, max_iterations=20):
+    def __init__(self, k=5, hierarchy=None, qi_attributes=None, max_iterations=20, use_fast_mode=True):
         self.k = k
         self.hierarchy = hierarchy
         self.qi_attributes = qi_attributes or []
         self.max_iterations = max_iterations
+        self.use_fast_mode = use_fast_mode  # Enable optimization
         self.current_levels = {}
         self.iteration_log = []
+        self._group_cache = {}  # Cache for groupby results
 
     def _find_violations(self, df):
         """Cari equivalence class yang violate k-anonymity."""
-        groups = df.groupby(self.qi_attributes).size()
+        if self.use_fast_mode:
+            # Fast mode: use observed=True for categorical optimization
+            groups = df.groupby(self.qi_attributes, observed=True, sort=False).size()
+        else:
+            groups = df.groupby(self.qi_attributes).size()
+        
         violations = groups[groups < self.k]
         return violations
 
     def _get_violation_indices(self, df, violations):
-        """Dapat index records yang masuk violation groups."""
-        violation_indices = []
+        """Dapat index records yang masuk violation groups (OPTIMIZED)."""
+        if self.use_fast_mode and len(violations) > 0:
+            # Fast mode: vectorized approach using merge
+            violation_keys = pd.DataFrame(
+                [k if isinstance(k, tuple) else (k,) for k in violations.index],
+                columns=self.qi_attributes
+            )
+            
+            # Create temporary join key
+            df_temp = df[self.qi_attributes].copy()
+            df_temp['_idx'] = df.index
+            
+            # Merge to find violation indices
+            merged = df_temp.merge(
+                violation_keys,
+                on=self.qi_attributes,
+                how='inner'
+            )
+            
+            return merged['_idx'].tolist()
+        else:
+            # Original slow approach (fallback)
+            violation_indices = []
 
-        for group_key in violations.index:
-            if not isinstance(group_key, tuple):
-                group_key = (group_key,)
+            for group_key in violations.index:
+                if not isinstance(group_key, tuple):
+                    group_key = (group_key,)
 
-            mask = pd.Series([True] * len(df), index=df.index)
-            for attr, val in zip(self.qi_attributes, group_key):
-                mask = mask & (df[attr].astype(str) == str(val))
+                mask = pd.Series([True] * len(df), index=df.index)
+                for attr, val in zip(self.qi_attributes, group_key):
+                    mask = mask & (df[attr].astype(str) == str(val))
 
-            violation_indices.extend(df[mask].index.tolist())
+                violation_indices.extend(df[mask].index.tolist())
 
-        return violation_indices
+            return violation_indices
 
     def _select_attribute_to_generalize(self, df_original, violation_indices):
         """
@@ -82,30 +110,59 @@ class KAnonymityEnforcer:
                               violation_indices, attribute):
         """
         Naikan level generalisasi violation records pada attribute tertentu.
-        Selalu dari ORIGINAL values.
+        Selalu dari ORIGINAL values. (OPTIMIZED for vectorization)
         """
         df_result = df_current.copy()
 
         if df_result[attribute].dtype != object:
             df_result[attribute] = df_result[attribute].astype(object)
 
-        for idx in violation_indices:
-            current_level = self.current_levels.get(idx, {}).get(attribute, 0)
-            max_level = self.hierarchy.get_max_level(attribute)
+        # Batch processing for speed
+        if self.use_fast_mode and len(violation_indices) > 100:
+            # Vectorized batch update
+            updates = []
+            for idx in violation_indices:
+                current_level = self.current_levels.get(idx, {}).get(attribute, 0)
+                max_level = self.hierarchy.get_max_level(attribute)
 
-            if current_level >= max_level:
-                continue
+                if current_level >= max_level:
+                    continue
 
-            new_level = current_level + 1
+                new_level = current_level + 1
 
-            if idx not in self.current_levels:
-                self.current_levels[idx] = {}
-            self.current_levels[idx][attribute] = new_level
+                if idx not in self.current_levels:
+                    self.current_levels[idx] = {}
+                self.current_levels[idx][attribute] = new_level
 
-            original_val = df_original.loc[idx, attribute]
-            df_result.at[idx, attribute] = self.hierarchy.generalize(
-                attribute, original_val, new_level
-            )
+                original_val = df_original.loc[idx, attribute]
+                generalized_val = self.hierarchy.generalize(
+                    attribute, original_val, new_level
+                )
+                updates.append((idx, generalized_val))
+            
+            # Batch update
+            if updates:
+                indices, values = zip(*updates)
+                df_result.loc[list(indices), attribute] = list(values)
+        else:
+            # Original approach for small batches
+            for idx in violation_indices:
+                current_level = self.current_levels.get(idx, {}).get(attribute, 0)
+                max_level = self.hierarchy.get_max_level(attribute)
+
+                if current_level >= max_level:
+                    continue
+
+                new_level = current_level + 1
+
+                if idx not in self.current_levels:
+                    self.current_levels[idx] = {}
+                self.current_levels[idx][attribute] = new_level
+
+                original_val = df_original.loc[idx, attribute]
+                df_result.at[idx, attribute] = self.hierarchy.generalize(
+                    attribute, original_val, new_level
+                )
 
         return df_result
 

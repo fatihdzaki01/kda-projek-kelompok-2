@@ -10,15 +10,31 @@ import pandas as pd
 from scipy.stats import entropy
 
 
-def calculate_information_loss(df_original, df_anonymized, qi_attributes):
+def calculate_information_loss(df_original, df_anonymized, qi_attributes, use_sampling=True, max_sample_size=100000):
     """
     Hitung information loss per attribute.
 
     Metrics:
     1. Unique values lost
     2. Entropy reduction (generalization intensity)
+    
+    Args:
+        df_original: Original dataframe
+        df_anonymized: Anonymized dataframe
+        qi_attributes: List of QI attribute names
+        use_sampling: Use sampling for large datasets (default True)
+        max_sample_size: Maximum sample size (default 100k)
     """
     results = []
+    
+    # Optimization: Sample for large datasets (entropy calculation)
+    if use_sampling and len(df_original) > max_sample_size:
+        print(f"  ⚡ Sampling {max_sample_size:,} rows for information loss calculation")
+        df_orig_calc = df_original.sample(n=max_sample_size, random_state=42)
+        df_anon_calc = df_anonymized.sample(n=max_sample_size, random_state=42)
+    else:
+        df_orig_calc = df_original
+        df_anon_calc = df_anonymized
 
     for attr in qi_attributes:
         try:
@@ -26,6 +42,7 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
             if attr not in df_original.columns or attr not in df_anonymized.columns:
                 continue
             
+            # Use full data for unique count (fast operation)
             orig_unique = df_original[attr].nunique()
             anon_unique = df_anonymized[attr].nunique()
 
@@ -35,9 +52,9 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
             else:
                 unique_lost_pct = (1 - anon_unique / orig_unique) * 100
 
-            # Handle entropy calculation
-            orig_value_counts = df_original[attr].value_counts(normalize=True)
-            anon_value_counts = df_anonymized[attr].value_counts(normalize=True)
+            # Use sampled data for entropy (slow operation)
+            orig_value_counts = df_orig_calc[attr].value_counts(normalize=True)
+            anon_value_counts = df_anon_calc[attr].value_counts(normalize=True)
             
             if len(orig_value_counts) == 0:
                 orig_entropy = 0.0
@@ -78,24 +95,40 @@ def calculate_information_loss(df_original, df_anonymized, qi_attributes):
     return pd.DataFrame(results)
 
 
-def calculate_kl_divergence(df_original, df_anonymized, qi_attributes):
+def calculate_kl_divergence(df_original, df_anonymized, qi_attributes, use_sampling=True, max_sample_size=100000):
     """
     Hitung KL-divergence untuk setiap attribute.
     KL-divergence mengukur seberapa berbeda distribusi anonymized dari original.
 
     Lower = better (distribusi lebih terjaga)
+    
+    Args:
+        df_original: Original dataframe
+        df_anonymized: Anonymized dataframe
+        qi_attributes: List of QI attribute names
+        use_sampling: Use sampling for large datasets (default True)
+        max_sample_size: Maximum sample size (default 100k)
     """
     import numpy as np
     results = []
+    
+    # Optimization: Sample for large datasets
+    if use_sampling and len(df_original) > max_sample_size:
+        print(f"  ⚡ Sampling {max_sample_size:,} rows for KL-divergence calculation")
+        df_orig_calc = df_original.sample(n=max_sample_size, random_state=42)
+        df_anon_calc = df_anonymized.sample(n=max_sample_size, random_state=42)
+    else:
+        df_orig_calc = df_original
+        df_anon_calc = df_anonymized
 
     for attr in qi_attributes:
         try:
             # Handle missing attributes
-            if attr not in df_original.columns or attr not in df_anonymized.columns:
+            if attr not in df_orig_calc.columns or attr not in df_anon_calc.columns:
                 continue
             
-            orig_dist = df_original[attr].value_counts(normalize=True)
-            anon_dist = df_anonymized[attr].value_counts(normalize=True)
+            orig_dist = df_orig_calc[attr].value_counts(normalize=True)
+            anon_dist = df_anon_calc[attr].value_counts(normalize=True)
 
             # Handle empty distributions
             if len(orig_dist) == 0 or len(anon_dist) == 0:
@@ -146,7 +179,7 @@ def calculate_kl_divergence(df_original, df_anonymized, qi_attributes):
     return pd.DataFrame(results)
 
 
-def calculate_reidentification_risk(df, qi_attributes):
+def calculate_reidentification_risk(df, qi_attributes, use_sampling=True, max_sample_size=100000):
     """
     Hitung re-identification risk.
 
@@ -154,6 +187,12 @@ def calculate_reidentification_risk(df, qi_attributes):
     1. Percentage of unique individuals (group size = 1)
     2. Percentage of small groups (group size < 5)
     3. Average group size
+    
+    Args:
+        df: DataFrame to analyze
+        qi_attributes: List of QI attribute names
+        use_sampling: Use sampling for large datasets (default True)
+        max_sample_size: Maximum sample size for risk calculation (default 100k)
     """
     try:
         # Handle empty dataframe
@@ -184,7 +223,13 @@ def calculate_reidentification_risk(df, qi_attributes):
                 'max_group_size': 0,
             }
         
-        groups = df.groupby(valid_qi).size()
+        # Optimization: Sample for large datasets
+        df_calc = df
+        if use_sampling and len(df) > max_sample_size:
+            print(f"  ⚡ Sampling {max_sample_size:,} rows for re-ID risk calculation (from {len(df):,} total)")
+            df_calc = df.sample(n=max_sample_size, random_state=42)
+        
+        groups = df_calc.groupby(valid_qi, observed=True).size()  # observed=True for categorical optimization
 
         unique_individuals = (groups == 1).sum()
         small_groups = (groups < 5).sum()
